@@ -14,7 +14,7 @@ export async function getSubmissions(filters: {type:string;status:string;search:
   const clause = where.length ? "WHERE " + where.join(" AND ") : "";
   const [rows, counts] = await Promise.all([
     pool().query(`SELECT id,type,name,email,organisation,category,subject,area,link,message,status,internal_notes,created_at FROM submissions ${clause} ORDER BY created_at DESC LIMIT 200`, values),
-    pool().query("SELECT type,status,COUNT(*)::int AS count FROM submissions GROUP BY type,status"),
+    pool().query(`SELECT type,status,COUNT(*)::int AS count FROM submissions ${clause} GROUP BY type,status`, values),
   ]);
   return { submissions: rows.rows, counts: counts.rows };
 }
