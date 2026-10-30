@@ -14,7 +14,7 @@ The platform will be developed in stages:
 
 1. **Corporate website** — organisation overview, vision, divisions, services, products, projects, partnerships, research, careers and contact.
 2. **Content and publishing** — news, insights, announcements and publications.
-3. **Enquiry and CRM foundations** — validated contact forms and structured enquiry handling.
+3. **Enquiry and CRM foundations** — validated contact forms, PostgreSQL-backed submissions and structured enquiry handling.
 4. **Careers and talent** — opportunities, applications and talent community.
 5. **Digital Workplace** — authenticated internal workspace for projects, communication, documentation and administration.
 6. **Integrations** — secure connections to approved external services as operational needs grow.
@@ -33,9 +33,13 @@ The platform will be developed in stages:
 
 The initial implementation is planned around Next.js, TypeScript, Tailwind CSS and a suitable managed deployment platform. Backend services, database and authentication choices will be introduced when the corresponding features are implemented.
 
+## Database setup
+
+The website uses PostgreSQL for durable contact, careers and partnership submissions. Provision a PostgreSQL database (for example, a Render PostgreSQL instance), set `DATABASE_URL` on the web service, and set `DATABASE_SSL=true` when the provider requires TLS. Apply `database/schema.sql` once to create the `submissions` table and indexes. The application does not automatically run schema changes at startup. Never commit database credentials. Email notifications are optional and use the Resend environment variables documented in `.env.example`; a saved submission remains stored if notification delivery is unavailable.
+
 ## Development
 
-The application scaffold and setup instructions will be added in the initial implementation commits.
+Install dependencies with `npm install`, configure a local `.env` using `.env.example`, apply `database/schema.sql` to your development PostgreSQL database, then run `npm run dev`. Run `npm run typecheck` and `npm run build` before submitting changes.
 
 ## Governance
 
