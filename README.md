@@ -49,3 +49,21 @@ This repository contains software and public-facing digital materials. Corporate
 
 **CodeMtaani Group**  
 *Think. Build. Transform.*
+
+
+## Administrator access
+
+The submission centre is available at `/admin`. Configure these server-only Render environment variables before using it:
+
+- `ADMIN_EMAIL`: the administrator's sign-in email.
+- `ADMIN_PASSWORD_HASH`: scrypt password hash in `saltHex:hashHex` format.
+- `ADMIN_SESSION_SECRET`: a random secret of at least 32 characters.
+- `DATABASE_URL` and `DATABASE_SSL`: required for stored submissions.
+
+Generate a password hash locally with Node.js:
+
+```bash
+node -e "const c=require('node:crypto');const s=c.randomBytes(16);const h=c.scryptSync(process.argv[1],s,64);console.log(s.toString('hex')+':'+h.toString('hex'))" "YOUR-STRONG-PASSWORD"
+```
+
+Generate the session secret with `node -e "console.log(require('node:crypto').randomBytes(48).toString('base64url'))"`. Keep all three administrator values private and never add them to Git. The admin session is an eight-hour, signed, HttpOnly cookie. The initial implementation supports one administrator account; add platform-level rate limiting and additional role management before expanding access to a larger team.
