@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const email = String(body.email || "").trim().toLowerCase(), fullName = String(body.full_name || "").trim(), password = String(body.password || ""), role = String(body.role || ""), scope = String(body.scope || "all");
-    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || email.length > 180 || !fullName || fullName.length > 120 || password.length < 12 || password.length > 200 || !validScope(role, scope)) return NextResponse.json({ error: "Provide a valid name, email, role, scope and password of at least 12 characters." }, { status: 400 });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 180 || !fullName || fullName.length > 120 || password.length < 12 || password.length > 200 || !validScope(role, scope)) return NextResponse.json({ error: "Provide a valid name, email, role, scope and password of at least 12 characters." }, { status: 400 });
     const result = await db().query("INSERT INTO admin_users(email,full_name,password_hash,role,scope) VALUES($1,$2,$3,$4,$5) RETURNING id,email,full_name,role,scope,active,created_at", [email,fullName,hashPassword(password),role,scope]);
     await audit(session, "staff_created", "admin_user", result.rows[0].id, { role, scope });
     return NextResponse.json({ user: result.rows[0] }, { status: 201 });
