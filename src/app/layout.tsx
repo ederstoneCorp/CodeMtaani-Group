@@ -1,5 +1,25 @@
 import type { Metadata } from "next";
+import { Bitcount_Prop_Single_Ink, Foldit, Happy_Monkey } from "next/font/google";
 import "./globals.css";
+
+const foldit = Foldit({
+  subsets: ["latin"],
+  variable: "--font-foldit",
+  display: "swap",
+});
+
+const bitcount = Bitcount_Prop_Single_Ink({
+  subsets: ["latin"],
+  variable: "--font-bitcount",
+  display: "swap",
+});
+
+const happyMonkey = Happy_Monkey({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-happy-monkey",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: {
@@ -15,7 +35,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body className={`${foldit.variable} ${bitcount.variable} ${happyMonkey.variable}`}>
+        {children}
+      </body>
     </html>
   );
 }
