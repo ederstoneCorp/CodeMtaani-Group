@@ -22,3 +22,14 @@ export async function updateSubmission(id: string, status: string, notes: string
   const result = await pool().query("UPDATE submissions SET status=$2, internal_notes=$3, updated_at=NOW() WHERE id=$1 RETURNING id", [id,status,notes.trim()]);
   return result.rowCount ? result.rows[0] : null;
 }
+
+export async function exportSubmissions(filters: {type:string;status:string;search:string}) {
+  const values: unknown[] = [];
+  const where: string[] = [];
+  if (["enquiry","career","partnership"].includes(filters.type)) { values.push(filters.type); where.push(`type = $${values.length}`); }
+  if (["new","reviewing","responded","closed","rejected"].includes(filters.status)) { values.push(filters.status); where.push(`status = $${values.length}`); }
+  if (filters.search.trim()) { values.push(`%${filters.search.trim().slice(0,100)}%`); where.push(`(name ILIKE $${values.length} OR email ILIKE $${values.length} OR subject ILIKE $${values.length} OR organisation ILIKE $${values.length} OR message ILIKE $${values.length})`); }
+  const clause = where.length ? "WHERE " + where.join(" AND ") : "";
+  const result = await pool().query(`SELECT id,type,name,email,organisation,category,subject,area,link,message,status,internal_notes,created_at,updated_at FROM submissions ${clause} ORDER BY created_at DESC LIMIT 5000`, values);
+  return result.rows as Record<string, unknown>[];
+}
