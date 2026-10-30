@@ -6,13 +6,20 @@ CREATE TABLE IF NOT EXISTS admin_users (
   full_name VARCHAR(120) NOT NULL,
   password_hash TEXT NOT NULL,
   role TEXT NOT NULL CHECK (role IN ('super_admin','operations','business_development','careers','partnerships','viewer')),
+  scope TEXT NOT NULL DEFAULT 'all' CHECK (scope IN ('all','enquiry','career','partnership')),
   active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  last_login_at TIMESTAMPTZ
+  last_login_at TIMESTAMPTZ,
+  CHECK (
+    (role IN ('super_admin','operations') AND scope='all') OR
+    (role='business_development' AND scope='enquiry') OR
+    (role='careers' AND scope='career') OR
+    (role='partnerships' AND scope='partnership') OR role='viewer'
+  )
 );
+ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS scope TEXT NOT NULL DEFAULT 'all';
 CREATE INDEX IF NOT EXISTS admin_users_role_active_idx ON admin_users (role, active);
-
 CREATE TABLE IF NOT EXISTS admin_audit_log (
   id BIGSERIAL PRIMARY KEY,
   actor_id UUID REFERENCES admin_users(id) ON DELETE SET NULL,
@@ -25,7 +32,6 @@ CREATE TABLE IF NOT EXISTS admin_audit_log (
 );
 CREATE INDEX IF NOT EXISTS admin_audit_log_created_idx ON admin_audit_log (created_at DESC);
 CREATE INDEX IF NOT EXISTS admin_audit_log_actor_idx ON admin_audit_log (actor_id, created_at DESC);
-
 CREATE TABLE IF NOT EXISTS admin_login_attempts (
   id BIGSERIAL PRIMARY KEY,
   email_key CHAR(64) NOT NULL,
@@ -35,5 +41,3 @@ CREATE TABLE IF NOT EXISTS admin_login_attempts (
 );
 CREATE INDEX IF NOT EXISTS admin_login_attempts_lookup_idx ON admin_login_attempts (email_key, ip_key, attempted_at DESC);
 CREATE INDEX IF NOT EXISTS admin_login_attempts_cleanup_idx ON admin_login_attempts (attempted_at);
-
--- Remove expired attempt records periodically (e.g. daily via a scheduled database job).
