@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import { Foldit, Happy_Monkey } from "next/font/google";
+import { Happy_Monkey, Josefin_Slab } from "next/font/google";
 import "./globals.css";
 
-const foldit = Foldit({ subsets: ["latin"], variable: "--font-foldit", display: "swap" });
 const happyMonkey = Happy_Monkey({ weight: "400", subsets: ["latin"], variable: "--font-happy-monkey", display: "swap" });
+const josefinSlab = Josefin_Slab({ subsets: ["latin"], variable: "--font-josefin-slab", display: "swap" });
 
 export const metadata: Metadata = {
   title: { default: "CodeMtaani Group | Think. Build. Transform.", template: "%s | CodeMtaani Group" },
@@ -13,5 +13,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body className={`${foldit.variable} ${happyMonkey.variable}`}>{children}</body></html>;
+  return <html lang="en"><body className={`${happyMonkey.variable} ${josefinSlab.variable}`}>{children}</body></html>;
 }
