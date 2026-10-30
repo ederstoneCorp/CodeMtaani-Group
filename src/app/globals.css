@@ -2,12 +2,12 @@
 @import "tailwindcss";
 
 :root {
-  --ink: #101511;
-  --muted: #66716a;
-  --paper: #f5f7f2;
-  --green: #a6ed62;
-  --deep: #101b15;
-  --line: rgba(16, 27, 21, .12);
+  --ink: #080808;
+  --muted: #555555;
+  --paper: #f4f4f4;
+  --green: #e00000;
+  --deep: #050505;
+  --line: rgba(0, 0, 0, .14);
 }
 
 * { box-sizing: border-box; }
@@ -23,7 +23,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 ::selection { background: var(--green); color: var(--ink); }
 .container { width: min(1180px, calc(100% - 48px)); margin-inline: auto; }
 .eyebrow {
-  color: #64834c;
+  color: #2600d8;
   font-family: "Bitcount Prop Single Ink", monospace;
   font-size: 11px;
   font-weight: 500;
@@ -41,3 +41,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
   background-size: 48px 48px;
 }
 @media (max-width: 640px) { .container { width: min(100% - 32px, 1180px); } }
+
+/* CodeMtaani brand palette */
+:root { --ink: #080808; --muted: #555555; --paper: #f4f4f4; --green: #e00000; --deep: #050505; --line: rgba(0,0,0,.14); --brand-blue: #2600d8; --brand-red: #e00000; }
+.eyebrow { color: var(--brand-blue); }
