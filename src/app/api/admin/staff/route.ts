@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 declare global { var codeMtaaniStaffAdminPool: Pool | undefined; }
 function db() {
   if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not configured.");
-  if (!global.codeMtaaniStaffAdminPool) global.codeMtaaniStaffAdminPool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: true } : false, max: 2, connectionTimeoutMillis: 8000 });
+  if (!global.codeMtaaniStaffAdminPool) global.codeMtaaniStaffAdminPool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: false } : false, max: 2, connectionTimeoutMillis: 8000 });
   return global.codeMtaaniStaffAdminPool;
 }
 const roles = ["super_admin","operations","business_development","careers","partnerships","viewer"];
@@ -26,7 +26,7 @@ export async function GET() {
   try {
     const result = await db().query("SELECT id,email,full_name,role,scope,active,created_at,last_login_at FROM admin_users ORDER BY created_at DESC");
     return NextResponse.json({ users: result.rows }, { headers: { "Cache-Control": "no-store, private" } });
-  } catch (error) { console.error("Staff list failed:", error); return NextResponse.json({ error: "Unable to load staff accounts. Apply database/staff-access.sql first." }, { status: 503 }); }
+  } catch (error) { console.error("Staff list failed:", error); return NextResponse.json({ error: "Unable to load staff accounts. Check the staff-access database migration and Render database connection." }, { status: 503 }); }
 }
 export async function POST(request: NextRequest) {
   const session = await getAdminSession();
