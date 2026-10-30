@@ -2,7 +2,7 @@ import { Pool } from "pg";
 declare global { var codeMtaaniAdminPool: Pool | undefined; }
 function pool() {
   if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not configured.");
-  if (!global.codeMtaaniAdminPool) global.codeMtaaniAdminPool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.DATABASE_SSL === "false" ? false : { rejectUnauthorized: false }, max: 3, connectionTimeoutMillis: 8000 });
+  if (!global.codeMtaaniAdminPool) global.codeMtaaniAdminPool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: true } : false, max: 3, connectionTimeoutMillis: 8000 });
   return global.codeMtaaniAdminPool;
 }
 export async function getSubmissions(filters: {type:string;status:string;search:string}) {
