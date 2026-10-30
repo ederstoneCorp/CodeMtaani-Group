@@ -5,10 +5,10 @@ function pool() {
   if (!global.codeMtaaniAdminPool) global.codeMtaaniAdminPool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: true } : false, max: 3, connectionTimeoutMillis: 8000 });
   return global.codeMtaaniAdminPool;
 }
-export async function getSubmissions(filters: {type:string;status:string;search:string}) {
+export async function getSubmissions(filters: {type:string;status:string;search:string;allowedTypes?:string[]}) {
   const values: unknown[] = [];
   const where: string[] = [];
-  if (["enquiry","career","partnership"].includes(filters.type)) { values.push(filters.type); where.push(`type = $${values.length}`); }
+  const allowed = filters.allowedTypes || ["enquiry","career","partnership"];\n  values.push(allowed); where.push(`type = ANY(${values.length}::text[])`);\n  if (["enquiry","career","partnership"].includes(filters.type) && allowed.includes(filters.type)) { values.push(filters.type); where.push(`type = ${values.length}`); }
   if (["new","reviewing","responded","closed","rejected"].includes(filters.status)) { values.push(filters.status); where.push(`status = $${values.length}`); }
   if (filters.search.trim()) { values.push(`%${filters.search.trim().slice(0,100)}%`); where.push(`(name ILIKE $${values.length} OR email ILIKE $${values.length} OR subject ILIKE $${values.length} OR organisation ILIKE $${values.length} OR message ILIKE $${values.length})`); }
   const clause = where.length ? "WHERE " + where.join(" AND ") : "";
@@ -23,10 +23,10 @@ export async function updateSubmission(id: string, status: string, notes: string
   return result.rowCount ? result.rows[0] : null;
 }
 
-export async function exportSubmissions(filters: {type:string;status:string;search:string}) {
+export async function exportSubmissions(filters: {type:string;status:string;search:string;allowedTypes?:string[]}) {
   const values: unknown[] = [];
   const where: string[] = [];
-  if (["enquiry","career","partnership"].includes(filters.type)) { values.push(filters.type); where.push(`type = $${values.length}`); }
+  const allowed = filters.allowedTypes || ["enquiry","career","partnership"];\n  values.push(allowed); where.push(`type = ANY(${values.length}::text[])`);\n  if (["enquiry","career","partnership"].includes(filters.type) && allowed.includes(filters.type)) { values.push(filters.type); where.push(`type = ${values.length}`); }
   if (["new","reviewing","responded","closed","rejected"].includes(filters.status)) { values.push(filters.status); where.push(`status = $${values.length}`); }
   if (filters.search.trim()) { values.push(`%${filters.search.trim().slice(0,100)}%`); where.push(`(name ILIKE $${values.length} OR email ILIKE $${values.length} OR subject ILIKE $${values.length} OR organisation ILIKE $${values.length} OR message ILIKE $${values.length})`); }
   const clause = where.length ? "WHERE " + where.join(" AND ") : "";
