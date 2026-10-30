@@ -7,7 +7,7 @@ export type AdminSession = { id: string | null; email: string; fullName: string;
 declare global { var codeMtaaniStaffPool: Pool | undefined; }
 function db() {
   if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is not configured.");
-  if (!global.codeMtaaniStaffPool) global.codeMtaaniStaffPool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: true } : false, max: 3, connectionTimeoutMillis: 8000 });
+  if (!global.codeMtaaniStaffPool) global.codeMtaaniStaffPool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: false } : false, max: 3, connectionTimeoutMillis: 8000 });
   return global.codeMtaaniStaffPool;
 }
 function secret() {
