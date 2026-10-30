@@ -14,7 +14,7 @@ const links = [
 export function SiteHeader() {
   return <header className="site-header"><div className="container nav-wrap">
     <Link href="/" className="brand-lockup" aria-label="CodeMtaani Group home">
-      <Image src="/Codemtaani%20Group%20logo%20(2).png" alt="CodeMtaani Group logo" width={56} height={56} priority className="brand-logo"/>
+      <Image src="/Codemtaani_Group_logo__2_-removebg-preview.png" alt="CodeMtaani Group logo" width={56} height={56} priority className="brand-logo"/>
       <span className="brand-name">CODEMTAANI<span>.</span><small>GROUP</small></span>
     </Link>
     <nav className="desktop-nav" aria-label="Main navigation">{links.map(([label,href])=><Link key={href} href={href}>{label}</Link>)}</nav>
