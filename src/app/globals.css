@@ -102,3 +102,171 @@
 
 /* Admin activity log */
 .audit-list{margin-top:14px}.audit-filters{grid-template-columns:minmax(220px,1.6fr) minmax(160px,.7fr)}.audit-event{padding:17px 14px;border-top:1px solid #ffffff12}.audit-event-main{display:flex;justify-content:space-between;align-items:flex-start;gap:18px}.audit-event-main>div{display:grid;gap:7px}.audit-event-main strong{font-size:13px;color:#e7f1f2;text-transform:capitalize}.audit-event-main span,.audit-event time,.audit-event p{font-size:11px;color:#91a8ac}.audit-event time{white-space:nowrap}.audit-event p{margin:10px 0 0;overflow-wrap:anywhere}.audit-event .audit-meta{color:#62cbd8}@media(max-width:560px){.audit-filters{grid-template-columns:1fr}.audit-event-main{flex-direction:column;gap:8px}}
+
+
+/* ==========================================================================
+   DROPDOWN MENUS & SELECT CONTROLS (PUBLIC & ADMIN)
+   ========================================================================== */
+
+/* Universal select & option dark theme styling */
+select {
+  background-color: #063b45;
+  color: #f4fbfc;
+  border: 1px solid rgba(72, 198, 212, 0.35);
+  border-radius: 8px;
+  padding: 12px 36px 12px 14px;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  cursor: pointer;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2348c6d4' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+select:hover {
+  border-color: rgba(72, 198, 212, 0.65);
+  background-color: #084753;
+}
+
+select:focus {
+  outline: none;
+  border-color: #48c6d4;
+  box-shadow: 0 0 0 3px rgba(72, 198, 212, 0.2);
+}
+
+select option {
+  background-color: #04242b !important;
+  color: #f4fbfc !important;
+  padding: 10px 14px;
+  font-size: 13px;
+}
+
+select option:checked,
+select option:hover {
+  background-color: #0b5965 !important;
+  color: #48c6d4 !important;
+}
+
+/* Public form specific dropdowns */
+.enquiry-form select,
+.application-panel select,
+.membership-form select {
+  width: 100%;
+  background-color: #06343d;
+  color: #f4fbfc;
+  border: 1px solid rgba(72, 198, 212, 0.3);
+  border-radius: 8px;
+  padding: 13px 38px 13px 14px;
+}
+
+.enquiry-form select:focus,
+.membership-form select:focus {
+  border-color: #48c6d4;
+  background-color: #08424d;
+  box-shadow: 0 0 0 3px rgba(72, 198, 212, 0.25);
+}
+
+/* Mobile navigation dropdown enhancements */
+.mobile-nav {
+  position: relative;
+  z-index: 100;
+}
+
+.mobile-nav summary {
+  background: rgba(6, 59, 69, 0.6);
+  border: 1px solid rgba(72, 198, 212, 0.35);
+  color: #f4fbfc;
+  transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+}
+
+.mobile-nav summary:hover {
+  background: #0b5965;
+  border-color: #48c6d4;
+  color: #48c6d4;
+}
+
+.mobile-nav[open] summary {
+  background: #0b5965;
+  border-color: #48c6d4;
+  color: #48c6d4;
+}
+
+.mobile-nav nav {
+  position: absolute;
+  right: 0;
+  top: 54px;
+  width: min(300px, calc(100vw - 32px));
+  padding: 14px;
+  background: rgba(4, 34, 40, 0.98);
+  border: 1px solid rgba(72, 198, 212, 0.35);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(72, 198, 212, 0.15);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  display: grid;
+  gap: 2px;
+  z-index: 110;
+  animation: mobileNavDrop 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes mobileNavDrop {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.mobile-nav nav a {
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #d2e3e6;
+  font-weight: 600;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.mobile-nav nav a:hover {
+  background: rgba(72, 198, 212, 0.12);
+  color: #48c6d4;
+  transform: translateX(4px);
+}
+
+/* ==========================================================================
+   PAGE & PANE TRANSITIONS
+   ========================================================================== */
+
+.page-transition-wrapper {
+  animation: pageFadeSlide 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: opacity, transform;
+}
+
+@keyframes pageFadeSlide {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-transition-wrapper {
+    animation: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+  }
+  .mobile-nav nav {
+    animation: none !important;
+  }
+}

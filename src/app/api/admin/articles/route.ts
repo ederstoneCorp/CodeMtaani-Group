@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/admin-auth";
-import { canManageContent, audit } from "@/lib/admin-roles";
-import { getAllArticles, createArticle, updateArticle, deleteArticle } from "@/lib/articles";
+import { canManageContent, canDeleteArticle, audit } from "@/lib/admin-roles";
+import { getAllArticles, createArticle, updateArticle, deleteArticle, getArticleById } from "@/lib/articles";
+import { deleteMediaAsset } from "@/lib/media";
 
 export const runtime = "nodejs";
 
@@ -81,7 +82,7 @@ export async function PATCH(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   const session = await getAdminSession();
   if (!session) return NextResponse.json({ error: "Unauthorised." }, { status: 401 });
-  if (!canManageContent(session)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+  if (!canDeleteArticle(session)) return NextResponse.json({ error: "Only Super Admin or Executive Administrator can delete articles." }, { status: 403 });
 
   try {
     const q = request.nextUrl.searchParams;
@@ -90,10 +91,22 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Invalid article ID." }, { status: 400 });
     }
 
+    // Retrieve article to check for cover image before deletion
+    const article = await getArticleById(id);
+    if (!article) return NextResponse.json({ error: "Article not found." }, { status: 404 });
+
+    // Delete cover image from media_assets if it references our media route
+    if (article.cover_image) {
+      const mediaMatch = article.cover_image.match(/\/api\/media\/([0-9a-f-]{36})/i);
+      if (mediaMatch) {
+        await deleteMediaAsset(mediaMatch[1]).catch(() => {/* ignore if already gone */});
+      }
+    }
+
     const success = await deleteArticle(id);
     if (!success) return NextResponse.json({ error: "Article not found." }, { status: 404 });
 
-    await audit(session, "article_deleted", "article", id);
+    await audit(session, "article_deleted", "article", id, { title: article.title });
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("Admin article delete failed:", error);

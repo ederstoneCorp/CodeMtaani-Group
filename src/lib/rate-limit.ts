@@ -32,3 +32,8 @@ export function isRateLimited(key: string, limit = 5, windowMs = 60_000): boolea
   existing.count += 1;
   return false;
 }
+
+export async function checkRateLimit(key: string, limit = 5, windowSeconds = 60): Promise<{ allowed: boolean }> {
+  const limited = isRateLimited(key, limit, windowSeconds * 1000);
+  return { allowed: !limited };
+}

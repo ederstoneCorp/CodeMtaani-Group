@@ -23,6 +23,11 @@ export async function getArticleBySlug(slug: string) {
   return r.rows[0] || null;
 }
 
+export async function getArticleById(id: string) {
+  const r = await query<Article>("SELECT * FROM articles WHERE id = $1 LIMIT 1", [id]);
+  return r.rows[0] || null;
+}
+
 export async function getAllArticles() {
   const r = await query<Article>("SELECT * FROM articles ORDER BY created_at DESC");
   return r.rows;

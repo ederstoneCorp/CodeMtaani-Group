@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Happy_Monkey, Josefin_Slab } from "next/font/google";
 import "./globals.css";
+import { PageTransition } from "@/components/page-transition";
 
 const happyMonkey = Happy_Monkey({ weight: "400", subsets: ["latin"], variable: "--font-happy-monkey", display: "swap" });
 const josefinSlab = Josefin_Slab({ subsets: ["latin"], variable: "--font-josefin-slab", display: "swap" });
@@ -13,5 +14,11 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body className={`${happyMonkey.variable} ${josefinSlab.variable}`}>{children}</body></html>;
+  return (
+    <html lang="en">
+      <body className={`${happyMonkey.variable} ${josefinSlab.variable}`}>
+        <PageTransition>{children}</PageTransition>
+      </body>
+    </html>
+  );
 }

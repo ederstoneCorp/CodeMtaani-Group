@@ -39,6 +39,8 @@ export function SiteFooter() {
         <div>
           <h3>Community</h3>
           <Link href="/membership">Membership Portal</Link>
+          <Link href="/innovation">Submit Innovation / Idea</Link>
+          <Link href="/track">Track Submission Status</Link>
           <Link href="/blog">Blog &amp; Insights</Link>
           <Link href="/events">Events &amp; Workshops</Link>
           <Link href="/careers">Careers &amp; Opportunities</Link>

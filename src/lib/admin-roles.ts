@@ -5,6 +5,9 @@ export type AdminRole =
   | "super_admin"
   | "executive_administrator"
   | "technical_administrator"
+  | "department_head"
+  | "project_manager"
+  | "staff_member"
   | "developer"
   | "business_development"
   | "marketing_and_communications"
@@ -23,6 +26,8 @@ export type AdminSession = {
   fullName: string;
   role: AdminRole;
   scope: AdminScope;
+  staffNumber?: string | null;
+  department?: string | null;
   legacy: boolean;
 };
 
@@ -67,13 +72,22 @@ export function createAdminToken(session: AdminSession) {
 
 export async function authenticateStaff(email: string, password: string): Promise<AdminSession | null> {
   const result = await db().query(
-    "SELECT id,email,full_name,password_hash,role,scope FROM admin_users WHERE lower(email)=lower($1) AND active=TRUE LIMIT 1",
+    "SELECT id, email, full_name, password_hash, role, scope, staff_number, department FROM admin_users WHERE lower(email)=lower($1) AND active=TRUE LIMIT 1",
     [email.trim()]
   );
   const row = result.rows[0];
   if (!row || !verifyPassword(password, row.password_hash)) return null;
   await db().query("UPDATE admin_users SET last_login_at=NOW() WHERE id=$1", [row.id]);
-  return { id: row.id, email: row.email, fullName: row.full_name, role: row.role, scope: row.scope, legacy: false };
+  return {
+    id: row.id,
+    email: row.email,
+    fullName: row.full_name,
+    role: row.role,
+    scope: row.scope,
+    staffNumber: row.staff_number || null,
+    department: row.department || null,
+    legacy: false,
+  };
 }
 
 export async function getAdminSession(): Promise<AdminSession | null> {
@@ -94,20 +108,55 @@ export async function getAdminSession(): Promise<AdminSession | null> {
       return { id: null, email: data.email, fullName: "Administrator", role: "super_admin", scope: "all", legacy: true };
     }
     if (!data.id) return null;
-    const result = await db().query("SELECT id,email,full_name,role,scope FROM admin_users WHERE id=$1 AND active=TRUE LIMIT 1", [data.id]);
+    const result = await db().query(
+      "SELECT id, email, full_name, role, scope, staff_number, department FROM admin_users WHERE id=$1 AND active=TRUE LIMIT 1",
+      [data.id]
+    );
     const row = result.rows[0];
     if (!row) return null;
-    return { id: row.id, email: row.email, fullName: row.full_name, role: row.role, scope: row.scope, legacy: false };
+    return {
+      id: row.id,
+      email: row.email,
+      fullName: row.full_name,
+      role: row.role,
+      scope: row.scope,
+      staffNumber: row.staff_number || null,
+      department: row.department || null,
+      legacy: false,
+    };
   } catch {
     return null;
   }
 }
 
-export async function audit(session: AdminSession, action: string, targetType?: string, targetId?: string, metadata: Record<string, unknown> = {}) {
-  await db().query(
-    "INSERT INTO admin_audit_log(actor_id,actor_email,action,target_type,target_id,metadata) VALUES($1,$2,$3,$4,$5,$6::jsonb)",
-    [session.id, session.email, action, targetType || null, targetId || null, JSON.stringify(metadata)]
-  );
+export async function audit(
+  session: AdminSession,
+  action: string,
+  targetType?: string,
+  targetId?: string,
+  metadata: Record<string, unknown> = {},
+  options?: { previousState?: unknown; newState?: unknown; ipAddress?: string }
+) {
+  try {
+    await db().query(
+      `INSERT INTO admin_audit_log(actor_id, actor_email, action, target_type, target_id, metadata, staff_number, previous_state, new_state, ip_address)
+       VALUES($1, $2, $3, $4, $5, $6::jsonb, $7, $8::jsonb, $9::jsonb, $10)`,
+      [
+        session.id,
+        session.email,
+        action,
+        targetType || null,
+        targetId || null,
+        JSON.stringify(metadata),
+        session.staffNumber || null,
+        options?.previousState ? JSON.stringify(options.previousState) : null,
+        options?.newState ? JSON.stringify(options.newState) : null,
+        options?.ipAddress || null,
+      ]
+    );
+  } catch (error) {
+    console.error("Audit log error:", error);
+  }
 }
 
 export async function recordLoginAttempt(email: string, ip: string, succeeded: boolean) {
@@ -130,7 +179,7 @@ export async function loginIsLimited(email: string, ip: string) {
 }
 
 export function allowedTypes(session: AdminSession): string[] {
-  if (session.role === "super_admin" || session.role === "executive_administrator" || session.role === "operations") {
+  if (["super_admin", "executive_administrator", "operations", "department_head"].includes(session.role)) {
     return ["enquiry", "career", "partnership"];
   }
   if (session.role === "business_development") {
@@ -154,11 +203,33 @@ export function canManageStaff(session: AdminSession): boolean {
 }
 
 export function canManageProjects(session: AdminSession): boolean {
-  return ["super_admin", "executive_administrator", "technical_administrator", "developer"].includes(session.role);
+  return [
+    "super_admin",
+    "executive_administrator",
+    "technical_administrator",
+    "department_head",
+    "project_manager",
+    "developer",
+  ].includes(session.role);
+}
+
+export function canManageTasks(session: AdminSession): boolean {
+  return session.role !== "viewer";
+}
+
+export function canManageAnnouncements(session: AdminSession): boolean {
+  return ["super_admin", "executive_administrator", "department_head", "marketing_and_communications"].includes(
+    session.role
+  );
 }
 
 export function canManageContent(session: AdminSession): boolean {
-  return ["super_admin", "executive_administrator", "marketing_and_communications", "content_manager"].includes(session.role);
+  return [
+    "super_admin",
+    "executive_administrator",
+    "marketing_and_communications",
+    "content_manager",
+  ].includes(session.role);
 }
 
 export function canManageMembers(session: AdminSession): boolean {
@@ -166,19 +237,54 @@ export function canManageMembers(session: AdminSession): boolean {
 }
 
 export function canManageEnquiries(session: AdminSession): boolean {
-  return ["super_admin", "executive_administrator", "business_development", "operations"].includes(session.role);
+  return [
+    "super_admin",
+    "executive_administrator",
+    "business_development",
+    "department_head",
+    "operations",
+  ].includes(session.role);
+}
+
+export function canReviewSubmissions(session: AdminSession): boolean {
+  return [
+    "super_admin",
+    "executive_administrator",
+    "technical_administrator",
+    "department_head",
+    "project_manager",
+    "operations",
+  ].includes(session.role);
 }
 
 export function canManageResearch(session: AdminSession): boolean {
-  return ["super_admin", "executive_administrator", "technical_administrator", "research_and_innovation"].includes(session.role);
+  return [
+    "super_admin",
+    "executive_administrator",
+    "technical_administrator",
+    "research_and_innovation",
+  ].includes(session.role);
 }
 
 export function canManageEvents(session: AdminSession): boolean {
-  return ["super_admin", "executive_administrator", "marketing_and_communications", "operations"].includes(session.role);
+  return [
+    "super_admin",
+    "executive_administrator",
+    "marketing_and_communications",
+    "operations",
+  ].includes(session.role);
 }
 
 export function canManageSettings(session: AdminSession): boolean {
   return session.role === "super_admin";
+}
+
+export function canDeleteArticle(session: AdminSession): boolean {
+  return session.role === "super_admin" || session.role === "executive_administrator";
+}
+
+export function canViewAudit(session: AdminSession): boolean {
+  return session.role === "super_admin" || session.role === "executive_administrator";
 }
 
 export function canExport(session: AdminSession): boolean {

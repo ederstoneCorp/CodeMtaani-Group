@@ -3,6 +3,7 @@ import Link from "next/link";
 import { PageShell } from "@/components/page-shell";
 import { getUpcomingEvents } from "@/lib/events";
 import { Calendar, Clock, MapPin, Video } from "lucide-react";
+import { EventRegisterButton } from "@/components/event-register-button";
 
 export const metadata: Metadata = {
   title: "Events",
@@ -57,7 +58,7 @@ export default async function EventsPage() {
                   <p style={{ marginTop: "12px", color: "#c2d8dc", fontSize: "13px", lineHeight: "1.75" }}>
                     {ev.description}
                   </p>
-                  <div style={{ marginTop: "auto", paddingTop: "24px", borderTop: "1px solid rgba(255,255,255,0.1)", display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <div style={{ marginTop: "auto", paddingTop: "20px", borderTop: "1px solid rgba(255,255,255,0.1)", display: "flex", flexDirection: "column", gap: "8px" }}>
                     <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "#a8c7cd" }}>
                       <Calendar size={14} style={{ color: "#48c6d4" }} />
                       {new Date(ev.start_time).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
@@ -66,6 +67,7 @@ export default async function EventsPage() {
                       <Clock size={14} style={{ color: "#48c6d4" }} />
                       {new Date(ev.start_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                     </span>
+                    <EventRegisterButton eventId={ev.id} eventTitle={ev.title} isVirtual={ev.is_virtual} />
                   </div>
                 </article>
               ))}

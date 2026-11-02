@@ -40,7 +40,9 @@ export async function GET() {
 
   try {
     const result = await query(
-      "SELECT id,email,full_name,role,scope,active,created_at,last_login_at FROM admin_users ORDER BY created_at DESC"
+      `SELECT id, email, full_name, role, scope, active, created_at, last_login_at,
+              staff_number, department, position, phone, notes
+       FROM admin_users ORDER BY created_at DESC`
     );
     return NextResponse.json({ users: result.rows }, { headers: { "Cache-Control": "no-store, private" } });
   } catch (error) {
@@ -61,6 +63,9 @@ export async function POST(request: NextRequest) {
     const password = String(body.password || "");
     const role = String(body.role || "");
     const scope = String(body.scope || "all");
+    const department = body.department ? String(body.department).trim() : null;
+    const position = body.position ? String(body.position).trim() : null;
+    const phone = body.phone ? String(body.phone).trim() : null;
 
     if (
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
@@ -77,9 +82,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await query<{ id: string; email: string; full_name: string; role: string; scope: string; active: boolean; created_at: string }>(
-      "INSERT INTO admin_users(email,full_name,password_hash,role,scope) VALUES($1,$2,$3,$4,$5) RETURNING id,email,full_name,role,scope,active,created_at",
-      [email, fullName, hashPassword(password), role, scope]
+    // Prevent non-super-admins from assigning super_admin role
+    if (role === "super_admin" && session.role !== "super_admin") {
+      return NextResponse.json({ error: "Only a Super Admin can create another Super Admin." }, { status: 403 });
+    }
+
+    const result = await query<{
+      id: string; email: string; full_name: string; role: string; scope: string;
+      active: boolean; created_at: string; staff_number: string;
+      department: string | null; position: string | null; phone: string | null;
+    }>(
+      `INSERT INTO admin_users(email, full_name, password_hash, role, scope, department, position, phone)
+       VALUES($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id, email, full_name, role, scope, active, created_at, staff_number, department, position, phone`,
+      [email, fullName, hashPassword(password), role, scope, department, position, phone]
     );
 
     await audit(session, "staff_created", "admin_user", result.rows[0].id, { role, scope });
@@ -101,23 +117,96 @@ export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
     const id = String(body.id || "");
-    const active = body.active;
 
-    if (!/^[0-9a-f-]{36}$/i.test(id) || typeof active !== "boolean") {
-      return NextResponse.json({ error: "Invalid staff update." }, { status: 400 });
+    if (!/^[0-9a-f-]{36}$/i.test(id)) {
+      return NextResponse.json({ error: "Invalid staff ID." }, { status: 400 });
     }
 
-    if (session.id === id && !active) {
-      return NextResponse.json({ error: "You cannot deactivate your own account." }, { status: 400 });
+    // Build dynamic update fields
+    const setClauses: string[] = [];
+    const values: unknown[] = [];
+    let paramIndex = 1;
+
+    const allowedFields: Record<string, { maxLen?: number; validate?: (v: unknown) => boolean }> = {
+      full_name: { maxLen: 120 },
+      email: { maxLen: 180, validate: (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v)) },
+      department: { maxLen: 80 },
+      position: { maxLen: 100 },
+      phone: { maxLen: 50 },
+      notes: {},
+    };
+
+    for (const [field, constraints] of Object.entries(allowedFields)) {
+      if (body[field] !== undefined) {
+        const val = body[field] === null ? null : String(body[field]).trim();
+        if (constraints.maxLen && val && val.length > constraints.maxLen) {
+          return NextResponse.json({ error: `${field} is too long.` }, { status: 400 });
+        }
+        if (constraints.validate && val && !constraints.validate(val)) {
+          return NextResponse.json({ error: `Invalid ${field}.` }, { status: 400 });
+        }
+        setClauses.push(`${field} = $${paramIndex}`);
+        values.push(val || null);
+        paramIndex++;
+      }
     }
 
-    const result = await query<{ id: string; email: string; full_name: string; role: string; scope: string; active: boolean }>(
-      "UPDATE admin_users SET active=$2,updated_at=NOW() WHERE id=$1 RETURNING id,email,full_name,role,scope,active",
-      [id, active]
+    // Handle role change
+    if (body.role !== undefined) {
+      const newRole = String(body.role);
+      if (!roles.includes(newRole)) {
+        return NextResponse.json({ error: "Invalid role." }, { status: 400 });
+      }
+      // Prevent non-super-admins from assigning super_admin
+      if (newRole === "super_admin" && session.role !== "super_admin") {
+        return NextResponse.json({ error: "Only a Super Admin can assign Super Admin role." }, { status: 403 });
+      }
+      setClauses.push(`role = $${paramIndex}`);
+      values.push(newRole);
+      paramIndex++;
+    }
+
+    // Handle scope change
+    if (body.scope !== undefined) {
+      const newScope = String(body.scope);
+      if (!scopes.includes(newScope)) {
+        return NextResponse.json({ error: "Invalid scope." }, { status: 400 });
+      }
+      setClauses.push(`scope = $${paramIndex}`);
+      values.push(newScope);
+      paramIndex++;
+    }
+
+    // Handle active toggle
+    if (typeof body.active === "boolean") {
+      if (session.id === id && !body.active) {
+        return NextResponse.json({ error: "You cannot deactivate your own account." }, { status: 400 });
+      }
+      setClauses.push(`active = $${paramIndex}`);
+      values.push(body.active);
+      paramIndex++;
+    }
+
+    if (setClauses.length === 0) {
+      return NextResponse.json({ error: "No fields to update." }, { status: 400 });
+    }
+
+    setClauses.push(`updated_at = NOW()`);
+    values.push(id);
+
+    const result = await query<{
+      id: string; email: string; full_name: string; role: string; scope: string;
+      active: boolean; staff_number: string; department: string | null;
+      position: string | null; phone: string | null; notes: string | null;
+      created_at: string; last_login_at: string | null;
+    }>(
+      `UPDATE admin_users SET ${setClauses.join(", ")} WHERE id = $${paramIndex}
+       RETURNING id, email, full_name, role, scope, active, staff_number, department, position, phone, notes, created_at, last_login_at`,
+      values
     );
 
     if (!result.rowCount) return NextResponse.json({ error: "Staff account not found." }, { status: 404 });
-    await audit(session, active ? "staff_activated" : "staff_deactivated", "admin_user", id);
+    await audit(session, "staff_updated", "admin_user", id, { fields: Object.keys(body).filter(k => k !== "id") });
     return NextResponse.json({ user: result.rows[0] });
   } catch (error) {
     console.error("Staff update failed:", error);

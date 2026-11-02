@@ -9,13 +9,21 @@ import {
   FolderGit2,
   Inbox,
   LogOut,
+  MessageSquare,
   Plus,
   RefreshCw,
   Shield,
   ShieldCheck,
+  Trash2,
   UserCheck,
   Users,
 } from "lucide-react";
+import { ImageUploader } from "./image-uploader";
+import { AdminNotificationsDropdown } from "./admin-notifications-dropdown";
+import { AdminAnalyticsView } from "./admin-analytics-view";
+import { AdminKanbanView } from "./admin-kanban-view";
+import { AdminCommunicationView } from "./admin-communication-view";
+import { AdminPortalSubmissionsView } from "./admin-portal-submissions-view";
 
 type Submission = {
   id: string;
@@ -78,6 +86,7 @@ type ArticleItem = {
   slug: string;
   category: string;
   status: string;
+  cover_image: string | null;
   author_name: string | null;
   published_at: string | null;
 };
@@ -102,7 +111,9 @@ type TeamItem = {
 };
 
 export function AdminPanel() {
-  const [tab, setTab] = useState<"overview" | "submissions" | "members" | "projects" | "articles" | "events" | "team">("overview");
+  const [tab, setTab] = useState<"overview" | "submissions" | "members" | "projects" | "articles" | "events" | "team" | "communication">("overview");
+  const [projSubTab, setProjSubTab] = useState<"kanban" | "list">("kanban");
+  const [subsSubTab, setSubsSubTab] = useState<"portal" | "enquiries">("portal");
 
   // User and Auth State
   const [role, setRole] = useState("super_admin");
@@ -112,8 +123,13 @@ export function AdminPanel() {
     manageStaff: false,
     export: true,
     manageProjects: true,
+    manageTasks: true,
+    manageAnnouncements: true,
     manageContent: true,
     manageMembers: true,
+    reviewSubmissions: true,
+    deleteArticle: false,
+    viewAudit: false,
   });
 
   // Global KPIs from Database
@@ -148,11 +164,14 @@ export function AdminPanel() {
   const [newProjCategory, setNewProjCategory] = useState("digital_solutions");
   const [newProjTech, setNewProjTech] = useState("");
   const [newProjGithub, setNewProjGithub] = useState("");
+  const [newProjImage, setNewProjImage] = useState<string | null>(null);
 
   const [newArtTitle, setNewArtTitle] = useState("");
   const [newArtExcerpt, setNewArtExcerpt] = useState("");
   const [newArtContent, setNewArtContent] = useState("");
   const [newArtCategory, setNewArtCategory] = useState("article");
+  const [newArtCover, setNewArtCover] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const [newEvTitle, setNewEvTitle] = useState("");
   const [newEvDesc, setNewEvDesc] = useState("");
@@ -163,6 +182,7 @@ export function AdminPanel() {
   const [newTeamName, setNewTeamName] = useState("");
   const [newTeamRole, setNewTeamRole] = useState("");
   const [newTeamDept, setNewTeamDept] = useState("Engineering");
+  const [newTeamAvatar, setNewTeamAvatar] = useState<string | null>(null);
 
   // UI status
   const [loading, setLoading] = useState(true);
@@ -344,6 +364,7 @@ export function AdminPanel() {
           category: newProjCategory,
           technologies: newProjTech.split(",").map((s) => s.trim()).filter(Boolean),
           github_url: newProjGithub || null,
+          image_url: newProjImage || null,
           status: "in_development",
         }),
       });
@@ -356,6 +377,7 @@ export function AdminPanel() {
       setNewProjDesc("");
       setNewProjTech("");
       setNewProjGithub("");
+      setNewProjImage(null);
       await loadProjects();
       await loadStats();
     } catch (err) {
@@ -379,6 +401,7 @@ export function AdminPanel() {
           excerpt: newArtExcerpt,
           content: newArtContent,
           category: newArtCategory,
+          cover_image: newArtCover,
           status: "published",
         }),
       });
@@ -390,10 +413,31 @@ export function AdminPanel() {
       setNewArtTitle("");
       setNewArtExcerpt("");
       setNewArtContent("");
+      setNewArtCover(null);
       await loadArticles();
       await loadStats();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create article");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Delete Article
+  async function handleDeleteArticle(id: string) {
+    setBusy(true);
+    setError("");
+    try {
+      const r = await fetch(`/api/admin/articles?id=${id}`, { method: "DELETE" });
+      if (!r.ok) {
+        const d = await r.json();
+        throw new Error(d.error || "Failed to delete article");
+      }
+      setDeleteConfirmId(null);
+      await loadArticles();
+      await loadStats();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete article");
     } finally {
       setBusy(false);
     }
@@ -446,6 +490,7 @@ export function AdminPanel() {
           full_name: newTeamName,
           role_title: newTeamRole,
           department: newTeamDept,
+          avatar_url: newTeamAvatar || null,
           is_active: true,
         }),
       });
@@ -456,6 +501,7 @@ export function AdminPanel() {
       setShowNewTeam(false);
       setNewTeamName("");
       setNewTeamRole("");
+      setNewTeamAvatar(null);
       await loadTeam();
       await loadStats();
     } catch (err) {
@@ -588,7 +634,27 @@ export function AdminPanel() {
               fontWeight: 600,
             }}
           >
-            <FolderGit2 size={17} /> Projects ({stats?.publishedProjects || 0})
+            <FolderGit2 size={17} /> Projects &amp; Tasks ({stats?.publishedProjects || 0})
+          </button>
+
+          <button
+            onClick={() => setTab("communication")}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              padding: "10px 14px",
+              borderRadius: "6px",
+              background: tab === "communication" ? "rgba(69,200,216,0.15)" : "transparent",
+              color: tab === "communication" ? "#45c8d8" : "#8fa5a9",
+              border: 0,
+              cursor: "pointer",
+              textAlign: "left",
+              fontSize: "13px",
+              fontWeight: 600,
+            }}
+          >
+            <MessageSquare size={17} /> Internal Comms &amp; Bulletin
           </button>
 
           <button
@@ -719,7 +785,8 @@ export function AdminPanel() {
               {tab === "overview" && "Executive Overview"}
               {tab === "submissions" && "Submission & Enquiry Desk"}
               {tab === "members" && "Membership Directory"}
-              {tab === "projects" && "Project Management"}
+              {tab === "projects" && "Project & Task Management"}
+              {tab === "communication" && "Internal Communication & Bulletin"}
               {tab === "articles" && "Content & Blog CMS"}
               {tab === "events" && "Events & Workshops"}
               {tab === "team" && "Team Profiles"}
@@ -727,6 +794,7 @@ export function AdminPanel() {
           </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <AdminNotificationsDropdown />
             <span
               style={{
                 fontSize: "11px",
@@ -818,122 +886,151 @@ export function AdminPanel() {
                 </p>
               </div>
             </div>
+
+            <div style={{ marginTop: "28px" }}>
+              <AdminAnalyticsView />
+            </div>
           </div>
         )}
 
         {/* SUBMISSIONS TAB */}
         {tab === "submissions" && (
           <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-              <div className="admin-actions">
-                {permissions.export && (
-                  <button
-                    className="admin-button secondary"
-                    onClick={() => {
-                      const p = new URLSearchParams();
-                      if (subType) p.set("type", subType);
-                      if (subStatus) p.set("status", subStatus);
-                      if (subSearch) p.set("q", subSearch);
-                      window.location.href = "/api/admin/export?" + p.toString();
-                    }}
-                  >
-                    <FileSpreadsheet size={14} style={{ marginRight: 6 }} /> Export CSV
-                  </button>
-                )}
-                <button className="admin-button secondary" onClick={() => loadSubmissions()}>
-                  <RefreshCw size={14} style={{ marginRight: 6 }} /> Refresh
-                </button>
-              </div>
+            <div style={{ display: "flex", gap: "10px", marginBottom: "16px", borderBottom: "1px solid #1a2c30", paddingBottom: "10px" }}>
+              <button
+                type="button"
+                className={`admin-button ${subsSubTab === "portal" ? "" : "secondary"}`}
+                style={{ padding: "6px 14px", fontSize: "12px" }}
+                onClick={() => setSubsSubTab("portal")}
+              >
+                Innovation &amp; Community Submissions
+              </button>
+              <button
+                type="button"
+                className={`admin-button ${subsSubTab === "enquiries" ? "" : "secondary"}`}
+                style={{ padding: "6px 14px", fontSize: "12px" }}
+                onClick={() => setSubsSubTab("enquiries")}
+              >
+                Website Contact Enquiries ({stats?.newSubmissions || 0})
+              </button>
             </div>
 
-            <section className="admin-workspace">
-              <div className="admin-list">
-                <div className="admin-filters">
-                  <input placeholder="Search submissions" value={subSearch} onChange={(e) => setSubSearch(e.target.value)} />
-                  <select value={subType} onChange={(e) => setSubType(e.target.value)}>
-                    <option value="">All types</option>
-                    <option value="enquiry">Enquiries</option>
-                    <option value="career">Careers</option>
-                    <option value="partnership">Partnerships</option>
-                  </select>
-                  <select value={subStatus} onChange={(e) => setSubStatus(e.target.value)}>
-                    <option value="">All statuses</option>
-                    {["new", "reviewing", "responded", "closed", "rejected"].map((s) => (
-                      <option key={s}>{s}</option>
-                    ))}
-                  </select>
+            {subsSubTab === "portal" ? (
+              <AdminPortalSubmissionsView />
+            ) : (
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                  <div className="admin-actions">
+                    {permissions.export && (
+                      <button
+                        className="admin-button secondary"
+                        onClick={() => {
+                          const p = new URLSearchParams();
+                          if (subType) p.set("type", subType);
+                          if (subStatus) p.set("status", subStatus);
+                          if (subSearch) p.set("q", subSearch);
+                          window.location.href = "/api/admin/export?" + p.toString();
+                        }}
+                      >
+                        <FileSpreadsheet size={14} style={{ marginRight: 6 }} /> Export CSV
+                      </button>
+                    )}
+                    <button className="admin-button secondary" onClick={() => loadSubmissions()}>
+                      <RefreshCw size={14} style={{ marginRight: 6 }} /> Refresh
+                    </button>
+                  </div>
                 </div>
 
-                {loading && <p className="admin-empty">Loading submissions…</p>}
-                {!loading &&
-                  items.map((item) => (
-                    <button
-                      className={"admin-submission " + (selectedSub?.id === item.id ? "active" : "")}
-                      key={item.id}
-                      onClick={() => chooseSub(item)}
-                    >
-                      <span className="admin-submission-top">
-                        <b>{item.name}</b>
-                        <small>{item.type}</small>
-                      </span>
-                      <span>{item.subject || item.area || item.organisation || "Submission"}</span>
-                      <small>
-                        {new Date(item.created_at).toLocaleString()} · {item.status}
-                      </small>
-                    </button>
-                  ))}
-                {!loading && !items.length && !error && <p className="admin-empty">No submissions match these filters.</p>}
-              </div>
+                <section className="admin-workspace">
+                  <div className="admin-list">
+                    <div className="admin-filters">
+                      <input placeholder="Search submissions" value={subSearch} onChange={(e) => setSubSearch(e.target.value)} />
+                      <select value={subType} onChange={(e) => setSubType(e.target.value)}>
+                        <option value="">All types</option>
+                        <option value="enquiry">Enquiries</option>
+                        <option value="career">Careers</option>
+                        <option value="partnership">Partnerships</option>
+                      </select>
+                      <select value={subStatus} onChange={(e) => setSubStatus(e.target.value)}>
+                        <option value="">All statuses</option>
+                        {["new", "reviewing", "responded", "closed", "rejected"].map((s) => (
+                          <option key={s}>{s}</option>
+                        ))}
+                      </select>
+                    </div>
 
-              <aside className="admin-detail">
-                {selectedSub ? (
-                  <>
-                    <p className="eyebrow">Submission details</p>
-                    <h2>{selectedSub.name}</h2>
-                    <p>
-                      <a href={"mailto:" + selectedSub.email}>{selectedSub.email}</a>
-                    </p>
-                    {selectedSub.organisation && <p>Org: {selectedSub.organisation}</p>}
-                    {selectedSub.category && <p>Category: {selectedSub.category}</p>}
-                    {selectedSub.area && <p>Area: {selectedSub.area}</p>}
-                    {selectedSub.link && (
-                      <p>
-                        <a href={selectedSub.link} target="_blank" rel="noreferrer">
-                          Open link ↗
-                        </a>
-                      </p>
-                    )}
-                    <div className="admin-message">{selectedSub.message}</div>
-                    {permissions.edit && (
-                      <>
-                        <label>
-                          Status
-                          <select value={subNextStatus} onChange={(e) => setSubNextStatus(e.target.value)}>
-                            {["new", "reviewing", "responded", "closed", "rejected"].map((s) => (
-                              <option key={s}>{s}</option>
-                            ))}
-                          </select>
-                        </label>
-                        <label>
-                          Internal notes
-                          <textarea
-                            rows={4}
-                            value={subNotes}
-                            onChange={(e) => setSubNotes(e.target.value)}
-                            placeholder="Administrative notes visible only to staff"
-                          />
-                        </label>
-                        <button className="admin-button" disabled={busy} onClick={saveSubStatus}>
-                          {busy ? "Saving…" : "Save changes"}
+                    {loading && <p className="admin-empty">Loading submissions…</p>}
+                    {!loading &&
+                      items.map((item) => (
+                        <button
+                          className={"admin-submission " + (selectedSub?.id === item.id ? "active" : "")}
+                          key={item.id}
+                          onClick={() => chooseSub(item)}
+                        >
+                          <span className="admin-submission-top">
+                            <b>{item.name}</b>
+                            <small>{item.type}</small>
+                          </span>
+                          <span>{item.subject || item.area || item.organisation || "Submission"}</span>
+                          <small>
+                            {new Date(item.created_at).toLocaleString()} · {item.status}
+                          </small>
                         </button>
+                      ))}
+                    {!loading && !items.length && !error && <p className="admin-empty">No submissions match these filters.</p>}
+                  </div>
+
+                  <aside className="admin-detail">
+                    {selectedSub ? (
+                      <>
+                        <p className="eyebrow">Submission details</p>
+                        <h2>{selectedSub.name}</h2>
+                        <p>
+                          <a href={"mailto:" + selectedSub.email}>{selectedSub.email}</a>
+                        </p>
+                        {selectedSub.organisation && <p>Org: {selectedSub.organisation}</p>}
+                        {selectedSub.category && <p>Category: {selectedSub.category}</p>}
+                        {selectedSub.area && <p>Area: {selectedSub.area}</p>}
+                        {selectedSub.link && (
+                          <p>
+                            <a href={selectedSub.link} target="_blank" rel="noreferrer">
+                              Open link ↗
+                            </a>
+                          </p>
+                        )}
+                        <div className="admin-message">{selectedSub.message}</div>
+                        {permissions.edit && (
+                          <>
+                            <label>
+                              Status
+                              <select value={subNextStatus} onChange={(e) => setSubNextStatus(e.target.value)}>
+                                {["new", "reviewing", "responded", "closed", "rejected"].map((s) => (
+                                  <option key={s}>{s}</option>
+                                ))}
+                              </select>
+                            </label>
+                            <label>
+                              Internal notes
+                              <textarea
+                                rows={4}
+                                value={subNotes}
+                                onChange={(e) => setSubNotes(e.target.value)}
+                                placeholder="Administrative notes visible only to staff"
+                              />
+                            </label>
+                            <button className="admin-button" disabled={busy} onClick={saveSubStatus}>
+                              {busy ? "Saving…" : "Save changes"}
+                            </button>
+                          </>
+                        )}
                       </>
+                    ) : (
+                      <p className="admin-empty">Select a submission to view details.</p>
                     )}
-                  </>
-                ) : (
-                  <p className="admin-empty">Select a submission to view details.</p>
-                )}
-              </aside>
-            </section>
+                  </aside>
+                </section>
+              </div>
+            )}
           </div>
         )}
 
@@ -1012,111 +1109,144 @@ export function AdminPanel() {
         {/* PROJECTS TAB */}
         {tab === "projects" && (
           <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-              <p style={{ fontSize: "13px", color: "#8fa5a9", margin: 0 }}>Manage published and in-development software projects.</p>
-              {permissions.manageProjects && (
-                <button className="admin-button" onClick={() => setShowNewProject(!showNewProject)}>
-                  <Plus size={14} style={{ marginRight: 6 }} /> Add Project
-                </button>
-              )}
-            </div>
-
-            {showNewProject && (
-              <form
-                onSubmit={handleCreateProject}
-                style={{
-                  background: "#101719",
-                  padding: "20px",
-                  border: "1px solid #45c8d8",
-                  borderRadius: "8px",
-                  marginBottom: "20px",
-                }}
+            <div style={{ display: "flex", gap: "10px", marginBottom: "16px", borderBottom: "1px solid #1a2c30", paddingBottom: "10px" }}>
+              <button
+                type="button"
+                className={`admin-button ${projSubTab === "kanban" ? "" : "secondary"}`}
+                style={{ padding: "6px 14px", fontSize: "12px" }}
+                onClick={() => setProjSubTab("kanban")}
               >
-                <h3 style={{ margin: "0 0 16px", fontSize: "16px" }}>New Project Entry</h3>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                  <label>
-                    Project Title
-                    <input required value={newProjTitle} onChange={(e) => setNewProjTitle(e.target.value)} placeholder="Title" />
-                  </label>
-                  <label>
-                    Category
-                    <select value={newProjCategory} onChange={(e) => setNewProjCategory(e.target.value)}>
-                      <option value="digital_solutions">Digital Solutions</option>
-                      <option value="ai_data">AI &amp; Data</option>
-                      <option value="fintech">FinTech</option>
-                      <option value="social_tech">Social Tech</option>
-                      <option value="cloud_infra">Cloud &amp; Infrastructure</option>
-                    </select>
-                  </label>
-                </div>
-                <label>
-                  Description
-                  <textarea
-                    required
-                    rows={3}
-                    value={newProjDesc}
-                    onChange={(e) => setNewProjDesc(e.target.value)}
-                    placeholder="Short description of the project"
-                  />
-                </label>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                  <label>
-                    Technologies (comma separated)
-                    <input value={newProjTech} onChange={(e) => setNewProjTech(e.target.value)} placeholder="Next.js, Python, PostgreSQL" />
-                  </label>
-                  <label>
-                    GitHub URL (optional)
-                    <input type="url" value={newProjGithub} onChange={(e) => setNewProjGithub(e.target.value)} placeholder="https://github.com/..." />
-                  </label>
-                </div>
-                <div style={{ marginTop: "16px", display: "flex", gap: "10px" }}>
-                  <button className="admin-button" disabled={busy} type="submit">
-                    {busy ? "Saving…" : "Create Project"}
-                  </button>
-                  <button className="admin-button secondary" type="button" onClick={() => setShowNewProject(false)}>
-                    Cancel
-                  </button>
-                </div>
-              </form>
-            )}
-
-            <div style={{ background: "#101719", border: "1px solid #263438", borderRadius: "8px", padding: "16px" }}>
-              {projects.length > 0 ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                  {projects.map((p) => (
-                    <div
-                      key={p.id}
-                      style={{
-                        padding: "14px",
-                        background: "#0a1113",
-                        border: "1px solid rgba(255,255,255,0.06)",
-                        borderRadius: "6px",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                      }}
-                    >
-                      <div>
-                        <strong style={{ fontSize: "14px", color: "#f1fbfc" }}>{p.title}</strong>
-                        <span style={{ fontSize: "11px", color: "#63d8e5", marginLeft: "10px", textTransform: "capitalize" }}>
-                          {p.category}
-                        </span>
-                        <small style={{ display: "block", color: "#8fa5a9", marginTop: "4px" }}>
-                          Status: {p.status} · Slug: /{p.slug}
-                        </small>
-                      </div>
-                      {p.github_url && (
-                        <a href={p.github_url} target="_blank" rel="noreferrer" className="text-link" style={{ fontSize: "11px" }}>
-                          Repo ↗
-                        </a>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="admin-empty">No projects created yet. Click &quot;Add Project&quot; above to create one.</p>
-              )}
+                Kanban Task Workspace
+              </button>
+              <button
+                type="button"
+                className={`admin-button ${projSubTab === "list" ? "" : "secondary"}`}
+                style={{ padding: "6px 14px", fontSize: "12px" }}
+                onClick={() => setProjSubTab("list")}
+              >
+                Projects Directory ({projects.length})
+              </button>
             </div>
+
+            {projSubTab === "kanban" ? (
+              <AdminKanbanView projects={projects} />
+            ) : (
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+                  <p style={{ fontSize: "13px", color: "#8fa5a9", margin: 0 }}>Manage published and in-development software projects.</p>
+                  {permissions.manageProjects && (
+                    <button className="admin-button" onClick={() => setShowNewProject(!showNewProject)}>
+                      <Plus size={14} style={{ marginRight: 6 }} /> Add Project
+                    </button>
+                  )}
+                </div>
+
+                {showNewProject && (
+                  <form
+                    onSubmit={handleCreateProject}
+                    style={{
+                      background: "#101719",
+                      padding: "20px",
+                      border: "1px solid #45c8d8",
+                      borderRadius: "8px",
+                      marginBottom: "20px",
+                    }}
+                  >
+                    <h3 style={{ margin: "0 0 16px", fontSize: "16px" }}>New Project Entry</h3>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                      <label>
+                        Project Title
+                        <input required value={newProjTitle} onChange={(e) => setNewProjTitle(e.target.value)} placeholder="Title" />
+                      </label>
+                      <label>
+                        Category
+                        <select value={newProjCategory} onChange={(e) => setNewProjCategory(e.target.value)}>
+                          <option value="digital_solutions">Digital Solutions</option>
+                          <option value="ai_data">AI &amp; Data</option>
+                          <option value="fintech">FinTech</option>
+                          <option value="social_tech">Social Tech</option>
+                          <option value="cloud_infra">Cloud &amp; Infrastructure</option>
+                        </select>
+                      </label>
+                    </div>
+                    <label>
+                      Description
+                      <textarea
+                        required
+                        rows={3}
+                        value={newProjDesc}
+                        onChange={(e) => setNewProjDesc(e.target.value)}
+                        placeholder="Short description of the project"
+                      />
+                    </label>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                      <label>
+                        Technologies (comma separated)
+                        <input value={newProjTech} onChange={(e) => setNewProjTech(e.target.value)} placeholder="Next.js, Python, PostgreSQL" />
+                      </label>
+                      <label>
+                        GitHub URL (optional)
+                        <input type="url" value={newProjGithub} onChange={(e) => setNewProjGithub(e.target.value)} placeholder="https://github.com/..." />
+                      </label>
+                    </div>
+                    <ImageUploader value={newProjImage} onChange={setNewProjImage} label="Project Screenshot / Banner" />
+                    <div style={{ marginTop: "16px", display: "flex", gap: "10px" }}>
+                      <button className="admin-button" disabled={busy} type="submit">
+                        {busy ? "Saving…" : "Create Project"}
+                      </button>
+                      <button className="admin-button secondary" type="button" onClick={() => setShowNewProject(false)}>
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                <div style={{ background: "#101719", border: "1px solid #263438", borderRadius: "8px", padding: "16px" }}>
+                  {projects.length > 0 ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                      {projects.map((p) => (
+                        <div
+                          key={p.id}
+                          style={{
+                            padding: "14px",
+                            background: "#0a1113",
+                            border: "1px solid rgba(255,255,255,0.06)",
+                            borderRadius: "6px",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                          }}
+                        >
+                          <div>
+                            <strong style={{ fontSize: "14px", color: "#f1fbfc" }}>{p.title}</strong>
+                            <span style={{ fontSize: "11px", color: "#63d8e5", marginLeft: "10px", textTransform: "capitalize" }}>
+                              {p.category}
+                            </span>
+                            <small style={{ display: "block", color: "#8fa5a9", marginTop: "4px" }}>
+                              Status: {p.status} · Slug: /{p.slug}
+                            </small>
+                          </div>
+                          {p.github_url && (
+                            <a href={p.github_url} target="_blank" rel="noreferrer" className="text-link" style={{ fontSize: "11px" }}>
+                              Repo ↗
+                            </a>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="admin-empty">No projects created yet. Click &quot;Add Project&quot; above to create one.</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* COMMUNICATION TAB */}
+        {tab === "communication" && (
+          <div>
+            <AdminCommunicationView canAnnounce={permissions.manageAnnouncements || permissions.manageStaff} />
           </div>
         )}
 
@@ -1173,6 +1303,7 @@ export function AdminPanel() {
                     placeholder="Article body content..."
                   />
                 </label>
+                <ImageUploader value={newArtCover} onChange={setNewArtCover} label="Cover Image" />
                 <div style={{ marginTop: "16px", display: "flex", gap: "10px" }}>
                   <button className="admin-button" disabled={busy} type="submit">
                     {busy ? "Publishing…" : "Publish Article"}
@@ -1198,17 +1329,97 @@ export function AdminPanel() {
                         display: "flex",
                         justifyContent: "space-between",
                         alignItems: "center",
+                        gap: "14px",
                       }}
                     >
-                      <div>
-                        <strong style={{ fontSize: "14px", color: "#f1fbfc" }}>{a.title}</strong>
-                        <span style={{ fontSize: "11px", color: "#63d8e5", marginLeft: "10px", textTransform: "capitalize" }}>
-                          {a.category}
-                        </span>
-                        <small style={{ display: "block", color: "#8fa5a9", marginTop: "4px" }}>
-                          By {a.author_name} · Status: {a.status}
-                        </small>
+                      <div style={{ display: "flex", alignItems: "center", gap: "12px", minWidth: 0 }}>
+                        {a.cover_image && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={a.cover_image}
+                            alt=""
+                            style={{
+                              width: "48px",
+                              height: "48px",
+                              borderRadius: "4px",
+                              objectFit: "cover",
+                              flexShrink: 0,
+                              border: "1px solid rgba(72,198,212,0.2)",
+                            }}
+                          />
+                        )}
+                        <div>
+                          <strong style={{ fontSize: "14px", color: "#f1fbfc", display: "block" }}>{a.title}</strong>
+                          <div style={{ display: "flex", gap: "8px", alignItems: "center", marginTop: "4px" }}>
+                            <span style={{ fontSize: "11px", color: "#63d8e5", textTransform: "capitalize" }}>
+                              {a.category}
+                            </span>
+                            <span style={{ color: "#3a5054" }}>·</span>
+                            <small style={{ color: "#8fa5a9" }}>
+                              By {a.author_name}
+                            </small>
+                            <span style={{ color: "#3a5054" }}>·</span>
+                            <span
+                              style={{
+                                fontSize: "10px",
+                                padding: "2px 6px",
+                                borderRadius: "4px",
+                                background: a.status === "published" ? "rgba(69,200,216,0.12)" : "rgba(255,255,255,0.06)",
+                                color: a.status === "published" ? "#45c8d8" : "#8fa5a9",
+                                textTransform: "uppercase",
+                              }}
+                            >
+                              {a.status}
+                            </span>
+                          </div>
+                        </div>
                       </div>
+
+                      {permissions.deleteArticle && (
+                        <div style={{ flexShrink: 0 }}>
+                          {deleteConfirmId === a.id ? (
+                            <div style={{ display: "flex", gap: "8px", alignItems: "center", background: "rgba(255,80,80,0.1)", padding: "6px 10px", borderRadius: "6px", border: "1px solid rgba(255,80,80,0.3)" }}>
+                              <span style={{ fontSize: "11px", color: "#ff8888", fontWeight: 600 }}>Delete?</span>
+                              <button
+                                type="button"
+                                className="admin-button"
+                                style={{ background: "#d32f2f", borderColor: "#d32f2f", padding: "4px 8px", fontSize: "11px", color: "#fff" }}
+                                onClick={() => handleDeleteArticle(a.id)}
+                                disabled={busy}
+                              >
+                                {busy ? "…" : "Confirm"}
+                              </button>
+                              <button
+                                type="button"
+                                className="admin-button secondary"
+                                style={{ padding: "4px 8px", fontSize: "11px" }}
+                                onClick={() => setDeleteConfirmId(null)}
+                                disabled={busy}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              className="admin-button secondary"
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "6px",
+                                padding: "6px 12px",
+                                fontSize: "11px",
+                                color: "#ff7777",
+                                borderColor: "rgba(255,119,119,0.25)",
+                              }}
+                              onClick={() => setDeleteConfirmId(a.id)}
+                              title="Delete this article permanently (Super Admin)"
+                            >
+                              <Trash2 size={13} /> Delete
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1370,6 +1581,7 @@ export function AdminPanel() {
                   Department
                   <input value={newTeamDept} onChange={(e) => setNewTeamDept(e.target.value)} placeholder="Engineering / AI / Product" />
                 </label>
+                <ImageUploader value={newTeamAvatar} onChange={setNewTeamAvatar} label="Profile Photo / Avatar" />
                 <div style={{ marginTop: "16px", display: "flex", gap: "10px" }}>
                   <button className="admin-button" disabled={busy} type="submit">
                     {busy ? "Saving…" : "Add Member"}

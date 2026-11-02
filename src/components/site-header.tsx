@@ -51,6 +51,7 @@ export function SiteHeader() {
               </Link>
             ))}
             <Link href="/partnerships">Partnerships</Link>
+            <Link href="/track">Track Submission</Link>
             <Link href="/contact">Contact</Link>
           </nav>
         </details>
