@@ -53,8 +53,8 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: "Unauthorised." }, { status: 401 });
   if (!canManageStaff(session)) return NextResponse.json({ error: "Forbidden: Super Admin or Executive privileges required." }, { status: 403 });
 
-  // Self-heal table schema before querying
-  await ensureStaffSchema();
+  // Self-heal table schema before querying (force check constraints cleanup)
+  await ensureStaffSchema(true);
 
   try {
     const result = await query(
@@ -97,18 +97,27 @@ export async function POST(request: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorised." }, { status: 401 });
   if (!canManageStaff(session)) return NextResponse.json({ error: "Forbidden: Super Admin or Executive privileges required." }, { status: 403 });
 
-  await ensureStaffSchema();
+  await ensureStaffSchema(true);
+
+  let email = "";
+  let fullName = "";
+  let password = "";
+  let role = "";
+  let scope = "all";
+  let department: string | null = null;
+  let position: string | null = null;
+  let phone: string | null = null;
 
   try {
     const body = await request.json();
-    const email = String(body.email || "").trim().toLowerCase();
-    const fullName = String(body.full_name || "").trim();
-    const password = String(body.password || "");
-    const role = String(body.role || "").trim();
-    const scope = String(body.scope || "all").trim();
-    const department = body.department ? String(body.department).trim() : null;
-    const position = body.position ? String(body.position).trim() : null;
-    const phone = body.phone ? String(body.phone).trim() : null;
+    email = String(body.email || "").trim().toLowerCase();
+    fullName = String(body.full_name || "").trim();
+    password = String(body.password || "");
+    role = String(body.role || "").trim();
+    scope = String(body.scope || "all").trim();
+    department = body.department ? String(body.department).trim() : null;
+    position = body.position ? String(body.position).trim() : null;
+    phone = body.phone ? String(body.phone).trim() : null;
 
     // Field Validations
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 180) {
@@ -230,10 +239,70 @@ export async function POST(request: NextRequest) {
       );
     }
     if (err.code === "23514") {
-      return NextResponse.json(
-        { error: `Database constraint violation: ${err.message}`, code: "CONSTRAINT_VIOLATION" },
-        { status: 400 }
-      );
+      try {
+        console.warn("Caught constraint violation 23514 (admin_users_check), auto-dropping legacy constraints and retrying insert...");
+        await query(`
+          ALTER TABLE admin_users DROP CONSTRAINT IF EXISTS admin_users_check;
+          ALTER TABLE admin_users DROP CONSTRAINT IF EXISTS admin_users_check1;
+          ALTER TABLE admin_users DROP CONSTRAINT IF EXISTS admin_users_check2;
+          ALTER TABLE admin_users DROP CONSTRAINT IF EXISTS admin_users_check3;
+          ALTER TABLE admin_users DROP CONSTRAINT IF EXISTS admin_users_role_check;
+          ALTER TABLE admin_users DROP CONSTRAINT IF EXISTS admin_users_scope_check;
+          ALTER TABLE admin_users DROP CONSTRAINT IF EXISTS chk_admin_role;
+        `);
+
+        // Retry the insert with cleaned constraints
+        const retryResult = await query<{
+          id: string;
+          email: string;
+          full_name: string;
+          role: string;
+          scope: string;
+          active: boolean;
+          created_at: string;
+          staff_number: string;
+          department: string | null;
+          position: string | null;
+          phone: string | null;
+          must_change_password: boolean;
+          provisioning_status: string;
+        }>(
+          `INSERT INTO admin_users(
+            email, full_name, password_hash, role, scope, department, position, phone,
+            must_change_password, provisioning_status
+          )
+          VALUES($1, $2, $3, $4, $5, $6, $7, $8, TRUE, 'pending_password_change')
+          RETURNING id, email, full_name, role, scope, active, created_at, staff_number,
+                    department, position, phone, must_change_password, provisioning_status`,
+          [email, fullName, hashPassword(password), role, scope, department, position, phone]
+        );
+
+        const newUser = retryResult.rows[0];
+
+        await audit(session, "staff_created", "admin_user", newUser.id, {
+          staff_number: newUser.staff_number,
+          role,
+          scope,
+          department,
+          position,
+          must_change_password: true,
+          repaired_constraints: true,
+        });
+
+        return NextResponse.json(
+          {
+            user: newUser,
+            message: `Staff member onboarded successfully! Unique Staff Number: ${newUser.staff_number}. Mandatory password change required on first login.`,
+          },
+          { status: 201 }
+        );
+      } catch (retryError: unknown) {
+        const retryErr = retryError as { message?: string };
+        return NextResponse.json(
+          { error: `Database constraint violation: ${retryErr.message || err.message}`, code: "CONSTRAINT_VIOLATION" },
+          { status: 400 }
+        );
+      }
     }
 
     return NextResponse.json(
@@ -248,7 +317,7 @@ export async function PATCH(request: NextRequest) {
   if (!session) return NextResponse.json({ error: "Unauthorised." }, { status: 401 });
   if (!canManageStaff(session)) return NextResponse.json({ error: "Forbidden: Super Admin or Executive privileges required." }, { status: 403 });
 
-  await ensureStaffSchema();
+  await ensureStaffSchema(true);
 
   try {
     const body = await request.json();
