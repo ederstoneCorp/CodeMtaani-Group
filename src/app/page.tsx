@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowDownRight, ArrowUpRight, Atom, BrainCircuit, Code2, Globe2, Layers3, Network, ShieldCheck, Sparkles, Workflow } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Atom, BrainCircuit, Code2, Globe2, Layers3, Network, Sparkles, Workflow } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 

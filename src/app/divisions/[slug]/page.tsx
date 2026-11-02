@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PageShell } from "@/components/page-shell";
-import { IntroSection, CardGrid, TextRows, ContactLink } from "@/components/content-blocks";
+import { IntroSection, TextRows, ContactLink } from "@/components/content-blocks";
 import { divisions } from "../division-data";
 export function generateStaticParams() { return divisions.map(({slug}) => ({slug})); }
 export function generateMetadata({params}:{params:Promise<{slug:string}>}): Promise<Metadata> { return params.then(({slug}) => { const item=divisions.find((d)=>d.slug===slug); return {title:item?.name ?? "Division"}; }); }
