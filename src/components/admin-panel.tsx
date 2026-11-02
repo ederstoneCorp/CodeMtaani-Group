@@ -198,6 +198,10 @@ export function AdminPanel() {
           return;
         }
         const d = await r.json();
+        if (d.user?.mustChangePassword) {
+          window.location.href = "/admin/change-password";
+          return;
+        }
         setPermissions(d.permissions || {});
         setRole(d.user?.role || "super_admin");
         setUserEmail(d.user?.email || "");

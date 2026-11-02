@@ -28,6 +28,8 @@ export type AdminSession = {
   scope: AdminScope;
   staffNumber?: string | null;
   department?: string | null;
+  mustChangePassword?: boolean;
+  provisioningStatus?: string;
   legacy: boolean;
 };
 
@@ -72,7 +74,9 @@ export function createAdminToken(session: AdminSession) {
 
 export async function authenticateStaff(email: string, password: string): Promise<AdminSession | null> {
   const result = await db().query(
-    "SELECT id, email, full_name, password_hash, role, scope, staff_number, department FROM admin_users WHERE lower(email)=lower($1) AND active=TRUE LIMIT 1",
+    `SELECT id, email, full_name, password_hash, role, scope, staff_number, department,
+            must_change_password, provisioning_status, active
+     FROM admin_users WHERE lower(email)=lower($1) AND active=TRUE LIMIT 1`,
     [email.trim()]
   );
   const row = result.rows[0];
@@ -86,6 +90,8 @@ export async function authenticateStaff(email: string, password: string): Promis
     scope: row.scope,
     staffNumber: row.staff_number || null,
     department: row.department || null,
+    mustChangePassword: Boolean(row.must_change_password),
+    provisioningStatus: row.provisioning_status || "active",
     legacy: false,
   };
 }
@@ -105,11 +111,22 @@ export async function getAdminSession(): Promise<AdminSession | null> {
     if (!data.email || data.exp <= Date.now()) return null;
     if (data.legacy) {
       if (data.email !== process.env.ADMIN_EMAIL?.trim().toLowerCase()) return null;
-      return { id: null, email: data.email, fullName: "Administrator", role: "super_admin", scope: "all", legacy: true };
+      return {
+        id: null,
+        email: data.email,
+        fullName: "Administrator",
+        role: "super_admin",
+        scope: "all",
+        mustChangePassword: false,
+        provisioningStatus: "active",
+        legacy: true,
+      };
     }
     if (!data.id) return null;
     const result = await db().query(
-      "SELECT id, email, full_name, role, scope, staff_number, department FROM admin_users WHERE id=$1 AND active=TRUE LIMIT 1",
+      `SELECT id, email, full_name, role, scope, staff_number, department,
+              must_change_password, provisioning_status
+       FROM admin_users WHERE id=$1 AND active=TRUE LIMIT 1`,
       [data.id]
     );
     const row = result.rows[0];
@@ -122,6 +139,8 @@ export async function getAdminSession(): Promise<AdminSession | null> {
       scope: row.scope,
       staffNumber: row.staff_number || null,
       department: row.department || null,
+      mustChangePassword: Boolean(row.must_change_password),
+      provisioningStatus: row.provisioning_status || "active",
       legacy: false,
     };
   } catch {
@@ -178,7 +197,12 @@ export async function loginIsLimited(email: string, ip: string) {
   return result.rows[0].count >= 10;
 }
 
+export function isPasswordChangeRequired(session: AdminSession): boolean {
+  return Boolean(session.mustChangePassword);
+}
+
 export function allowedTypes(session: AdminSession): string[] {
+  if (session.mustChangePassword) return [];
   if (["super_admin", "executive_administrator", "operations", "department_head"].includes(session.role)) {
     return ["enquiry", "career", "partnership"];
   }
@@ -195,14 +219,17 @@ export function allowedTypes(session: AdminSession): string[] {
 }
 
 export function canEdit(session: AdminSession): boolean {
+  if (session.mustChangePassword) return false;
   return session.role !== "viewer";
 }
 
 export function canManageStaff(session: AdminSession): boolean {
+  if (session.mustChangePassword) return false;
   return session.role === "super_admin" || session.role === "executive_administrator";
 }
 
 export function canManageProjects(session: AdminSession): boolean {
+  if (session.mustChangePassword) return false;
   return [
     "super_admin",
     "executive_administrator",
@@ -214,16 +241,19 @@ export function canManageProjects(session: AdminSession): boolean {
 }
 
 export function canManageTasks(session: AdminSession): boolean {
+  if (session.mustChangePassword) return false;
   return session.role !== "viewer";
 }
 
 export function canManageAnnouncements(session: AdminSession): boolean {
+  if (session.mustChangePassword) return false;
   return ["super_admin", "executive_administrator", "department_head", "marketing_and_communications"].includes(
     session.role
   );
 }
 
 export function canManageContent(session: AdminSession): boolean {
+  if (session.mustChangePassword) return false;
   return [
     "super_admin",
     "executive_administrator",
@@ -233,10 +263,12 @@ export function canManageContent(session: AdminSession): boolean {
 }
 
 export function canManageMembers(session: AdminSession): boolean {
+  if (session.mustChangePassword) return false;
   return ["super_admin", "executive_administrator", "operations"].includes(session.role);
 }
 
 export function canManageEnquiries(session: AdminSession): boolean {
+  if (session.mustChangePassword) return false;
   return [
     "super_admin",
     "executive_administrator",
@@ -247,6 +279,7 @@ export function canManageEnquiries(session: AdminSession): boolean {
 }
 
 export function canReviewSubmissions(session: AdminSession): boolean {
+  if (session.mustChangePassword) return false;
   return [
     "super_admin",
     "executive_administrator",
@@ -258,6 +291,7 @@ export function canReviewSubmissions(session: AdminSession): boolean {
 }
 
 export function canManageResearch(session: AdminSession): boolean {
+  if (session.mustChangePassword) return false;
   return [
     "super_admin",
     "executive_administrator",
@@ -267,6 +301,7 @@ export function canManageResearch(session: AdminSession): boolean {
 }
 
 export function canManageEvents(session: AdminSession): boolean {
+  if (session.mustChangePassword) return false;
   return [
     "super_admin",
     "executive_administrator",
@@ -276,17 +311,21 @@ export function canManageEvents(session: AdminSession): boolean {
 }
 
 export function canManageSettings(session: AdminSession): boolean {
+  if (session.mustChangePassword) return false;
   return session.role === "super_admin";
 }
 
 export function canDeleteArticle(session: AdminSession): boolean {
+  if (session.mustChangePassword) return false;
   return session.role === "super_admin" || session.role === "executive_administrator";
 }
 
 export function canViewAudit(session: AdminSession): boolean {
+  if (session.mustChangePassword) return false;
   return session.role === "super_admin" || session.role === "executive_administrator";
 }
 
 export function canExport(session: AdminSession): boolean {
+  if (session.mustChangePassword) return false;
   return session.role !== "viewer";
 }

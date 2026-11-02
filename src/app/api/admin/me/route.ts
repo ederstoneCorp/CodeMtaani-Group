@@ -34,6 +34,8 @@ export async function GET() {
         scope: session.scope,
         staffNumber: session.staffNumber || null,
         department: session.department || null,
+        mustChangePassword: Boolean(session.mustChangePassword),
+        provisioningStatus: session.provisioningStatus || "active",
       },
       permissions: {
         edit: canEdit(session),
