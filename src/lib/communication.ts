@@ -53,7 +53,9 @@ export type Announcement = {
   content: string;
   priority: "low" | "normal" | "high" | "urgent";
   target_department: string | null;
+  target_role?: string | null;
   attachment_url: string | null;
+  image_url?: string | null;
   created_by: string | null;
   published_at: string;
   created_at: string;
@@ -206,35 +208,40 @@ export async function createAnnouncement(data: {
   content: string;
   priority?: Announcement["priority"];
   target_department?: string | null;
+  target_role?: string | null;
   attachment_url?: string | null;
+  image_url?: string | null;
   created_by?: string | null;
 }): Promise<Announcement> {
   const r = await query<Announcement>(
-    `INSERT INTO internal_announcements (title, content, priority, target_department, attachment_url, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6)
+    `INSERT INTO internal_announcements (title, content, priority, target_department, target_role, attachment_url, image_url, created_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      RETURNING *`,
     [
       data.title,
       data.content,
       data.priority || "normal",
       data.target_department || null,
+      data.target_role || null,
       data.attachment_url || null,
+      data.image_url || null,
       data.created_by || null,
     ]
   );
   return r.rows[0];
 }
 
-export async function getAnnouncements(userId: string, department?: string | null): Promise<Announcement[]> {
+export async function getAnnouncements(userId: string, department?: string | null, role?: string | null): Promise<Announcement[]> {
   const r = await query<Announcement>(
     `SELECT a.*, u.full_name AS author_name, u.staff_number AS author_staff_number,
             EXISTS (SELECT 1 FROM announcement_reads r WHERE r.announcement_id = a.id AND r.user_id = $1) AS is_read
      FROM internal_announcements a
      LEFT JOIN admin_users u ON u.id = a.created_by
-     WHERE a.target_department IS NULL OR a.target_department = $2
+     WHERE (a.target_department IS NULL OR a.target_department = '' OR a.target_department = $2)
+       AND (a.target_role IS NULL OR a.target_role = '' OR a.target_role = $3)
      ORDER BY a.published_at DESC
      LIMIT 50`,
-    [userId, department || ""]
+    [userId, department || "", role || ""]
   );
   return r.rows;
 }

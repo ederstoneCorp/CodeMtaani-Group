@@ -11,7 +11,7 @@ export async function GET() {
   if (!session || !session.id) return NextResponse.json({ error: "Unauthorised." }, { status: 401 });
 
   try {
-    const announcements = await getAnnouncements(session.id, session.department);
+    const announcements = await getAnnouncements(session.id, session.department, session.role);
     return NextResponse.json({ announcements }, { headers: { "Cache-Control": "no-store, private" } });
   } catch (error) {
     console.error("Announcements GET failed:", error);
@@ -38,7 +38,9 @@ export async function POST(request: NextRequest) {
       content,
       priority: body.priority || "normal",
       target_department: body.target_department || null,
+      target_role: body.target_role || null,
       attachment_url: body.attachment_url || null,
+      image_url: body.image_url || null,
       created_by: session.id,
     });
 

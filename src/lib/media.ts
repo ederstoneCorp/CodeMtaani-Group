@@ -6,9 +6,10 @@ const ALLOWED_MIME_TYPES = [
   "image/webp",
   "image/gif",
   "image/svg+xml",
+  "application/pdf",
 ];
 
-const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 
 export type MediaAsset = {
   id: string;
@@ -22,10 +23,10 @@ export type MediaAsset = {
 
 export function validateMediaUpload(mimeType: string, sizeBytes: number): string | null {
   if (!ALLOWED_MIME_TYPES.includes(mimeType)) {
-    return `Unsupported file type: ${mimeType}. Allowed: JPEG, PNG, WebP, GIF, SVG.`;
+    return `Unsupported file type: ${mimeType}. Allowed: JPEG, PNG, WebP, GIF, SVG, and PDF documents.`;
   }
   if (sizeBytes > MAX_SIZE_BYTES) {
-    return `File too large (${(sizeBytes / 1024 / 1024).toFixed(1)} MB). Maximum: 5 MB.`;
+    return `File too large (${(sizeBytes / 1024 / 1024).toFixed(1)} MB). Maximum: 10 MB.`;
   }
   if (sizeBytes === 0) {
     return "File is empty.";

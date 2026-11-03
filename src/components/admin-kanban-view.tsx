@@ -1,8 +1,9 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
-import { Calendar, MessageSquare, Plus, Trash2, User } from "lucide-react";
+import { DragEvent, FormEvent, useCallback, useEffect, useState } from "react";
+import { Calendar, MessageSquare, Plus, RefreshCw, Trash2, User } from "lucide-react";
 import type { ProjectTask, TaskComment } from "@/lib/tasks";
+import { safeFetchJson } from "@/lib/safe-fetch";
 
 type StaffOption = { id: string; full_name: string; staff_number: string | null; department: string | null };
 type ProjectOption = { id: string; title: string };
@@ -20,6 +21,7 @@ export function AdminKanbanView({ projects }: { projects: ProjectOption[] }) {
   const [staff, setStaff] = useState<StaffOption[]>([]);
   const [selectedProject, setSelectedProject] = useState<string>("all");
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // New task modal
   const [showNewTask, setShowNewTask] = useState(false);
@@ -37,27 +39,26 @@ export function AdminKanbanView({ projects }: { projects: ProjectOption[] }) {
   const [newComment, setNewComment] = useState("");
   const [loadingComments, setLoadingComments] = useState(false);
 
+  // Drag state
+  const [dragOverCol, setDragOverCol] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const loadTasks = useCallback(async () => {
-    try {
-      const url = selectedProject === "all" ? "/api/admin/tasks" : `/api/admin/tasks?projectId=${selectedProject}`;
-      const res = await fetch(url);
-      if (res.ok) {
-        const d = await res.json();
-        setTasks(d.tasks || []);
-      }
-    } catch {}
+    const url = selectedProject === "all" ? "/api/admin/tasks" : `/api/admin/tasks?projectId=${selectedProject}`;
+    const res = await safeFetchJson<{ tasks: ProjectTask[] }>(url);
+    if (res.ok && res.data) {
+      setTasks(res.data.tasks || []);
+      setFetchError(null);
+    } else {
+      setFetchError(res.error || "Failed to load tasks.");
+    }
   }, [selectedProject]);
 
   const loadStaff = useCallback(async () => {
-    try {
-      const res = await fetch("/api/admin/staff");
-      if (res.ok) {
-        const d = await res.json();
-        setStaff(d.users || []);
-      }
-    } catch {}
+    const res = await safeFetchJson<{ users: StaffOption[] }>("/api/admin/staff");
+    if (res.ok && res.data) {
+      setStaff(res.data.users || []);
+    }
   }, []);
 
   useEffect(() => {
@@ -68,83 +69,116 @@ export function AdminKanbanView({ projects }: { projects: ProjectOption[] }) {
   async function handleCreateTask(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
-    try {
-      const res = await fetch("/api/admin/tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          project_id: taskProjId || (projects[0]?.id || ""),
-          title: taskTitle,
-          description: taskDesc,
-          assignee_id: taskAssignee || null,
-          priority: taskPriority,
-          deadline: taskDeadline || null,
-          stage: taskStage,
-        }),
-      });
-      if (res.ok) {
-        setShowNewTask(false);
-        setTaskTitle("");
-        setTaskDesc("");
-        setTaskDeadline("");
-        await loadTasks();
-      }
-    } catch {}
+
+    const res = await safeFetchJson<{ task: ProjectTask }>("/api/admin/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        project_id: taskProjId || (projects[0]?.id || ""),
+        title: taskTitle,
+        description: taskDesc,
+        assignee_id: taskAssignee || null,
+        priority: taskPriority,
+        deadline: taskDeadline || null,
+        stage: taskStage,
+      }),
+    });
+
+    if (res.ok) {
+      setShowNewTask(false);
+      setTaskTitle("");
+      setTaskDesc("");
+      setTaskDeadline("");
+      await loadTasks();
+    } else {
+      alert(res.error || "Failed to create task.");
+    }
     setBusy(false);
   }
 
   async function moveStage(task: ProjectTask, newStage: ProjectTask["stage"]) {
-    try {
-      // Optimistic update
-      setTasks((prev) =>
-        prev.map((t) => (t.id === task.id ? { ...t, stage: newStage } : t))
-      );
-      await fetch("/api/admin/tasks", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: task.id, stage: newStage }),
-      });
+    // Optimistic update
+    setTasks((prev) =>
+      prev.map((t) => (t.id === task.id ? { ...t, stage: newStage } : t))
+    );
+    if (activeTask && activeTask.id === task.id) {
+      setActiveTask({ ...activeTask, stage: newStage });
+    }
+
+    const res = await safeFetchJson("/api/admin/tasks", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: task.id, stage: newStage }),
+    });
+
+    if (!res.ok) {
       await loadTasks();
-    } catch {}
+    }
   }
 
   async function openTaskDetails(task: ProjectTask) {
     setActiveTask(task);
     setLoadingComments(true);
-    try {
-      const res = await fetch(`/api/admin/tasks/comments?taskId=${task.id}`);
-      if (res.ok) {
-        const d = await res.json();
-        setComments(d.comments || []);
-      }
-    } catch {}
+    const res = await safeFetchJson<{ comments: TaskComment[] }>(
+      `/api/admin/tasks/comments?taskId=${task.id}`
+    );
+    if (res.ok && res.data) {
+      setComments(res.data.comments || []);
+    }
     setLoadingComments(false);
   }
 
   async function handleAddComment(e: FormEvent) {
     e.preventDefault();
     if (!activeTask || !newComment.trim()) return;
-    try {
-      const res = await fetch("/api/admin/tasks/comments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskId: activeTask.id, comment: newComment }),
-      });
-      if (res.ok) {
-        const d = await res.json();
-        setComments((prev) => [...prev, d.comment]);
-        setNewComment("");
-      }
-    } catch {}
+
+    const res = await safeFetchJson<{ comment: TaskComment }>("/api/admin/tasks/comments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ taskId: activeTask.id, comment: newComment }),
+    });
+
+    if (res.ok && res.data) {
+      setComments((prev) => [...prev, res.data!.comment]);
+      setNewComment("");
+    }
   }
 
   async function handleDeleteTask(id: string) {
     if (!confirm("Are you sure you want to delete this task?")) return;
-    try {
-      await fetch(`/api/admin/tasks?id=${id}`, { method: "DELETE" });
+    const res = await safeFetchJson(`/api/admin/tasks?id=${id}`, { method: "DELETE" });
+    if (res.ok) {
       setActiveTask(null);
       await loadTasks();
-    } catch {}
+    }
+  }
+
+  // HTML5 Drag and Drop handlers
+  function handleDragStart(e: DragEvent<HTMLDivElement>, taskId: string) {
+    e.dataTransfer.setData("text/plain", taskId);
+    e.dataTransfer.effectAllowed = "move";
+  }
+
+  function handleDragOver(e: DragEvent<HTMLDivElement>, colKey: string) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverCol !== colKey) setDragOverCol(colKey);
+  }
+
+  function handleDragLeave(e: DragEvent<HTMLDivElement>, colKey: string) {
+    e.preventDefault();
+    if (dragOverCol === colKey) setDragOverCol(null);
+  }
+
+  function handleDrop(e: DragEvent<HTMLDivElement>, colKey: ProjectTask["stage"]) {
+    e.preventDefault();
+    setDragOverCol(null);
+    const taskId = e.dataTransfer.getData("text/plain");
+    if (!taskId) return;
+    const task = tasks.find((t) => t.id === taskId);
+    if (task && task.stage !== colKey) {
+      moveStage(task, colKey);
+    }
   }
 
   function getPriorityColor(priority: string) {
@@ -163,12 +197,21 @@ export function AdminKanbanView({ projects }: { projects: ProjectOption[] }) {
   return (
     <div>
       {/* TOOLBAR */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "16px",
+          flexWrap: "wrap",
+          gap: "10px",
+        }}
+      >
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <select
             value={selectedProject}
             onChange={(e) => setSelectedProject(e.target.value)}
-            style={{ width: "240px" }}
+            style={{ width: "260px" }}
           >
             <option value="all">All Projects ({tasks.length} tasks)</option>
             {projects.map((p) => (
@@ -177,12 +220,38 @@ export function AdminKanbanView({ projects }: { projects: ProjectOption[] }) {
               </option>
             ))}
           </select>
+
+          <button
+            type="button"
+            className="admin-button secondary"
+            onClick={() => loadTasks()}
+            title="Refresh tasks"
+            style={{ padding: "8px 12px", fontSize: "12px" }}
+          >
+            <RefreshCw size={13} style={{ marginRight: 6 }} /> Refresh
+          </button>
         </div>
 
         <button className="admin-button" onClick={() => setShowNewTask(true)}>
           <Plus size={14} style={{ marginRight: 6 }} /> Create Task
         </button>
       </div>
+
+      {fetchError && (
+        <div
+          style={{
+            padding: "10px 14px",
+            background: "rgba(220, 38, 38, 0.15)",
+            border: "1px solid rgba(220, 38, 38, 0.4)",
+            borderRadius: "6px",
+            color: "#fca5a5",
+            fontSize: "12px",
+            marginBottom: "16px",
+          }}
+        >
+          {fetchError}
+        </div>
+      )}
 
       {/* CREATE TASK MODAL */}
       {showNewTask && (
@@ -208,12 +277,25 @@ export function AdminKanbanView({ projects }: { projects: ProjectOption[] }) {
               width: "100%",
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "16px",
+              }}
+            >
               <h3 style={{ fontSize: "18px", margin: 0, color: "#f1fbfc" }}>Create Project Task</h3>
               <button
                 type="button"
                 onClick={() => setShowNewTask(false)}
-                style={{ background: "transparent", border: "none", color: "#8fa5a9", fontSize: "20px", cursor: "pointer" }}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "#8fa5a9",
+                  fontSize: "20px",
+                  cursor: "pointer",
+                }}
               >
                 ✕
               </button>
@@ -222,22 +304,40 @@ export function AdminKanbanView({ projects }: { projects: ProjectOption[] }) {
             <form onSubmit={handleCreateTask}>
               <label>
                 Project
-                <select value={taskProjId} onChange={(e) => setTaskProjId(e.target.value)} required>
-                  <option value="" disabled>Select target project</option>
+                <select
+                  value={taskProjId}
+                  onChange={(e) => setTaskProjId(e.target.value)}
+                  required
+                >
+                  <option value="" disabled>
+                    Select target project
+                  </option>
                   {projects.map((p) => (
-                    <option key={p.id} value={p.id}>{p.title}</option>
+                    <option key={p.id} value={p.id}>
+                      {p.title}
+                    </option>
                   ))}
                 </select>
               </label>
 
               <label>
                 Task Title
-                <input required value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} placeholder="e.g. Implement Webhook verification" />
+                <input
+                  required
+                  value={taskTitle}
+                  onChange={(e) => setTaskTitle(e.target.value)}
+                  placeholder="e.g. Implement Webhook verification"
+                />
               </label>
 
               <label>
                 Description &amp; Acceptance Criteria
-                <textarea rows={3} value={taskDesc} onChange={(e) => setTaskDesc(e.target.value)} placeholder="Task details..." />
+                <textarea
+                  rows={3}
+                  value={taskDesc}
+                  onChange={(e) => setTaskDesc(e.target.value)}
+                  placeholder="Task details..."
+                />
               </label>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
@@ -254,7 +354,12 @@ export function AdminKanbanView({ projects }: { projects: ProjectOption[] }) {
                 </label>
                 <label>
                   Priority
-                  <select value={taskPriority} onChange={(e) => setTaskPriority(e.target.value as "low" | "medium" | "high" | "critical")}>
+                  <select
+                    value={taskPriority}
+                    onChange={(e) =>
+                      setTaskPriority(e.target.value as "low" | "medium" | "high" | "critical")
+                    }
+                  >
                     <option value="low">Low</option>
                     <option value="medium">Medium</option>
                     <option value="high">High</option>
@@ -266,15 +371,24 @@ export function AdminKanbanView({ projects }: { projects: ProjectOption[] }) {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
                 <label>
                   Initial Stage
-                  <select value={taskStage} onChange={(e) => setTaskStage(e.target.value as ProjectTask["stage"])}>
+                  <select
+                    value={taskStage}
+                    onChange={(e) => setTaskStage(e.target.value as ProjectTask["stage"])}
+                  >
                     {STAGES.map((s) => (
-                      <option key={s.key} value={s.key}>{s.label}</option>
+                      <option key={s.key} value={s.key}>
+                        {s.label}
+                      </option>
                     ))}
                   </select>
                 </label>
                 <label>
                   Deadline
-                  <input type="date" value={taskDeadline} onChange={(e) => setTaskDeadline(e.target.value)} />
+                  <input
+                    type="date"
+                    value={taskDeadline}
+                    onChange={(e) => setTaskDeadline(e.target.value)}
+                  />
                 </label>
               </div>
 
@@ -318,9 +432,23 @@ export function AdminKanbanView({ projects }: { projects: ProjectOption[] }) {
               flexDirection: "column",
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                marginBottom: "12px",
+              }}
+            >
               <div>
-                <span style={{ fontSize: "11px", color: "#63d8e5", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                <span
+                  style={{
+                    fontSize: "11px",
+                    color: "#63d8e5",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.1em",
+                  }}
+                >
                   {activeTask.project_title}
                 </span>
                 <h3 style={{ fontSize: "18px", margin: "4px 0", color: "#f1fbfc" }}>{activeTask.title}</h3>
@@ -328,18 +456,42 @@ export function AdminKanbanView({ projects }: { projects: ProjectOption[] }) {
               <button
                 type="button"
                 onClick={() => setActiveTask(null)}
-                style={{ background: "transparent", border: "none", color: "#8fa5a9", fontSize: "20px", cursor: "pointer" }}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "#8fa5a9",
+                  fontSize: "20px",
+                  cursor: "pointer",
+                }}
               >
                 ✕
               </button>
             </div>
 
-            <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "16px", flexWrap: "wrap" }}>
-              <span style={{ fontSize: "11px", padding: "3px 8px", borderRadius: "4px", background: "rgba(255,255,255,0.06)", color: getPriorityColor(activeTask.priority), border: "1px solid currentColor" }}>
+            <div
+              style={{
+                display: "flex",
+                gap: "12px",
+                alignItems: "center",
+                marginBottom: "16px",
+                flexWrap: "wrap",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "11px",
+                  padding: "3px 8px",
+                  borderRadius: "4px",
+                  background: "rgba(255,255,255,0.06)",
+                  color: getPriorityColor(activeTask.priority),
+                  border: "1px solid currentColor",
+                }}
+              >
                 {activeTask.priority}
               </span>
               <span style={{ fontSize: "11px", color: "#8fa5a9" }}>
-                Assignee: <strong style={{ color: "#f1fbfc" }}>{activeTask.assignee_name || "Unassigned"}</strong> {activeTask.assignee_staff_number && `(${activeTask.assignee_staff_number})`}
+                Assignee: <strong style={{ color: "#f1fbfc" }}>{activeTask.assignee_name || "Unassigned"}</strong>{" "}
+                {activeTask.assignee_staff_number && `(${activeTask.assignee_staff_number})`}
               </span>
               {activeTask.deadline && (
                 <span style={{ fontSize: "11px", color: "#8fa5a9" }}>
@@ -362,31 +514,56 @@ export function AdminKanbanView({ projects }: { projects: ProjectOption[] }) {
                 onChange={(e) => {
                   const newSt = e.target.value as ProjectTask["stage"];
                   moveStage(activeTask, newSt);
-                  setActiveTask({ ...activeTask, stage: newSt });
                 }}
                 style={{ width: "160px", padding: "6px 12px" }}
               >
                 {STAGES.map((s) => (
-                  <option key={s.key} value={s.key}>{s.label}</option>
+                  <option key={s.key} value={s.key}>
+                    {s.label}
+                  </option>
                 ))}
               </select>
               <button
                 type="button"
                 className="admin-button secondary"
                 onClick={() => handleDeleteTask(activeTask.id)}
-                style={{ marginLeft: "auto", color: "#ff7777", borderColor: "#552020", padding: "6px 12px", fontSize: "11px" }}
+                style={{
+                  marginLeft: "auto",
+                  color: "#ff7777",
+                  borderColor: "#552020",
+                  padding: "6px 12px",
+                  fontSize: "11px",
+                }}
               >
                 <Trash2 size={13} style={{ marginRight: 4 }} /> Delete
               </button>
             </div>
 
             {/* COMMENTS SECTION */}
-            <div style={{ borderTop: "1px solid #1c2b2f", paddingTop: "14px", flex: 1, overflowY: "auto", display: "flex", flexDirection: "column" }}>
+            <div
+              style={{
+                borderTop: "1px solid #1c2b2f",
+                paddingTop: "14px",
+                flex: 1,
+                overflowY: "auto",
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
               <h4 style={{ fontSize: "13px", color: "#f1fbfc", margin: "0 0 10px" }}>
                 Discussion &amp; Updates ({comments.length})
               </h4>
 
-              <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "10px", marginBottom: "12px" }}>
+              <div
+                style={{
+                  flex: 1,
+                  overflowY: "auto",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "10px",
+                  marginBottom: "12px",
+                }}
+              >
                 {loadingComments ? (
                   <span style={{ fontSize: "12px", color: "#779095" }}>Loading comments…</span>
                 ) : comments.length === 0 ? (
@@ -394,11 +571,20 @@ export function AdminKanbanView({ projects }: { projects: ProjectOption[] }) {
                 ) : (
                   comments.map((c) => (
                     <div key={c.id} style={{ background: "#061316", padding: "10px 12px", borderRadius: "6px" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "4px" }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          fontSize: "11px",
+                          marginBottom: "4px",
+                        }}
+                      >
                         <strong style={{ color: "#45c8d8" }}>
                           {c.user_name} {c.user_staff_number && `(${c.user_staff_number})`}
                         </strong>
-                        <small style={{ color: "#5d787d" }}>{new Date(c.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</small>
+                        <small style={{ color: "#5d787d" }}>
+                          {new Date(c.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        </small>
                       </div>
                       <p style={{ margin: 0, fontSize: "12px", color: "#d2e3e6" }}>{c.comment}</p>
                     </div>
@@ -423,120 +609,188 @@ export function AdminKanbanView({ projects }: { projects: ProjectOption[] }) {
         </div>
       )}
 
-      {/* KANBAN BOARD */}
+      {/* KANBAN BOARD CONTAINER: HORIZONTALLY BOUNDED */}
       {loading ? (
         <div style={{ padding: "40px", textAlign: "center", color: "#8fa5a9" }}>Loading board…</div>
       ) : (
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(5, minmax(220px, 1fr))",
-            gap: "14px",
-            alignItems: "start",
+            width: "100%",
+            maxWidth: "100%",
             overflowX: "auto",
-            paddingBottom: "16px",
+            WebkitOverflowScrolling: "touch",
+            paddingBottom: "8px",
           }}
         >
-          {STAGES.map((col) => {
-            const colTasks = tasks.filter((t) => t.stage === col.key);
-            return (
-              <div
-                key={col.key}
-                style={{
-                  background: "#081518",
-                  border: "1px solid #1a2c30",
-                  borderRadius: "10px",
-                  padding: "14px",
-                  display: "flex",
-                  flexDirection: "column",
-                  minHeight: "480px",
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", paddingBottom: "8px", borderBottom: "1px solid #17262a" }}>
-                  <span style={{ fontSize: "13px", fontWeight: 700, color: "#f1fbfc" }}>
-                    {col.label}
-                  </span>
-                  <span
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(5, minmax(230px, 1fr))",
+              minWidth: "1180px",
+              gap: "14px",
+              alignItems: "start",
+            }}
+          >
+            {STAGES.map((col) => {
+              const colTasks = tasks.filter((t) => t.stage === col.key);
+              const isOver = dragOverCol === col.key;
+
+              return (
+                <div
+                  key={col.key}
+                  onDragOver={(e) => handleDragOver(e, col.key)}
+                  onDragLeave={(e) => handleDragLeave(e, col.key)}
+                  onDrop={(e) => handleDrop(e, col.key)}
+                  style={{
+                    background: isOver ? "rgba(69,200,216,0.06)" : "#081518",
+                    border: `1px solid ${isOver ? "#45c8d8" : "#1a2c30"}`,
+                    borderRadius: "10px",
+                    padding: "14px",
+                    display: "flex",
+                    flexDirection: "column",
+                    minHeight: "480px",
+                    transition: "border-color 0.15s ease, background 0.15s ease",
+                  }}
+                >
+                  <div
                     style={{
-                      background: "rgba(69,200,216,0.15)",
-                      color: "#45c8d8",
-                      fontSize: "11px",
-                      fontWeight: 700,
-                      padding: "2px 7px",
-                      borderRadius: "999px",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: "12px",
+                      paddingBottom: "8px",
+                      borderBottom: "1px solid #17262a",
                     }}
                   >
-                    {colTasks.length}
-                  </span>
-                </div>
+                    <span style={{ fontSize: "13px", fontWeight: 700, color: "#f1fbfc" }}>{col.label}</span>
+                    <span
+                      style={{
+                        background: "rgba(69,200,216,0.15)",
+                        color: "#45c8d8",
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        padding: "2px 7px",
+                        borderRadius: "999px",
+                      }}
+                    >
+                      {colTasks.length}
+                    </span>
+                  </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "10px", flex: 1 }}>
-                  {colTasks.map((t) => {
-                    const isOverdue = t.deadline && new Date(t.deadline) < new Date() && t.stage !== "completed";
-                    return (
-                      <div
-                        key={t.id}
-                        onClick={() => openTaskDetails(t)}
-                        style={{
-                          background: "#0c1f24",
-                          border: `1px solid ${isOverdue ? "rgba(255,100,100,0.3)" : "rgba(255,255,255,0.06)"}`,
-                          borderRadius: "8px",
-                          padding: "12px",
-                          cursor: "pointer",
-                          transition: "border-color 0.15s ease, transform 0.15s ease",
-                        }}
-                      >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "6px", marginBottom: "6px" }}>
-                          <span style={{ fontSize: "10px", color: "#63d8e5", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                            {t.project_title}
-                          </span>
-                          <span
+                  <div style={{ display: "flex", flexDirection: "column", gap: "10px", flex: 1 }}>
+                    {colTasks.map((t) => {
+                      const isOverdue =
+                        t.deadline && new Date(t.deadline) < new Date() && t.stage !== "completed";
+
+                      return (
+                        <div
+                          key={t.id}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, t.id)}
+                          onClick={() => openTaskDetails(t)}
+                          style={{
+                            background: "#0c1f24",
+                            border: `1px solid ${isOverdue ? "rgba(255,100,100,0.3)" : "rgba(255,255,255,0.06)"}`,
+                            borderRadius: "8px",
+                            padding: "12px",
+                            cursor: "grab",
+                            transition: "border-color 0.15s ease, transform 0.15s ease",
+                          }}
+                        >
+                          <div
                             style={{
-                              fontSize: "9px",
-                              fontWeight: 700,
-                              textTransform: "uppercase",
-                              padding: "2px 5px",
-                              borderRadius: "4px",
-                              background: "rgba(0,0,0,0.3)",
-                              color: getPriorityColor(t.priority),
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "flex-start",
+                              gap: "6px",
+                              marginBottom: "6px",
                             }}
                           >
-                            {t.priority}
-                          </span>
-                        </div>
-
-                        <strong style={{ fontSize: "13px", color: "#f1fbfc", display: "block", marginBottom: "6px" }}>
-                          {t.title}
-                        </strong>
-
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "10px", fontSize: "11px", color: "#8fa5a9" }}>
-                          <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                            <User size={12} /> {t.assignee_name || "Unassigned"}
-                          </span>
-                          {t.comment_count ? (
-                            <span style={{ display: "inline-flex", alignItems: "center", gap: "3px" }}>
-                              <MessageSquare size={11} /> {t.comment_count}
+                            <span
+                              style={{
+                                fontSize: "10px",
+                                color: "#63d8e5",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.08em",
+                              }}
+                            >
+                              {t.project_title}
                             </span>
-                          ) : null}
-                        </div>
-
-                        {t.deadline && (
-                          <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "6px", fontSize: "10px", color: isOverdue ? "#ff8888" : "#718e93" }}>
-                            <Calendar size={11} /> {new Date(t.deadline).toLocaleDateString()}
+                            <span
+                              style={{
+                                fontSize: "9px",
+                                fontWeight: 700,
+                                textTransform: "uppercase",
+                                padding: "2px 5px",
+                                borderRadius: "4px",
+                                background: "rgba(0,0,0,0.3)",
+                                color: getPriorityColor(t.priority),
+                              }}
+                            >
+                              {t.priority}
+                            </span>
                           </div>
-                        )}
+
+                          <strong style={{ fontSize: "13px", color: "#f1fbfc", display: "block", marginBottom: "6px" }}>
+                            {t.title}
+                          </strong>
+
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              marginTop: "10px",
+                              fontSize: "11px",
+                              color: "#8fa5a9",
+                            }}
+                          >
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                              <User size={12} /> {t.assignee_name || "Unassigned"}
+                            </span>
+                            {t.comment_count ? (
+                              <span style={{ display: "inline-flex", alignItems: "center", gap: "3px" }}>
+                                <MessageSquare size={11} /> {t.comment_count}
+                              </span>
+                            ) : null}
+                          </div>
+
+                          {t.deadline && (
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px",
+                                marginTop: "6px",
+                                fontSize: "10px",
+                                color: isOverdue ? "#ff8888" : "#718e93",
+                              }}
+                            >
+                              <Calendar size={11} /> {new Date(t.deadline).toLocaleDateString()}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {colTasks.length === 0 && (
+                      <div
+                        style={{
+                          textAlign: "center",
+                          padding: "30px 0",
+                          color: "#50696e",
+                          fontSize: "11px",
+                          border: isOver ? "1px dashed #45c8d8" : "1px dashed transparent",
+                          borderRadius: "6px",
+                        }}
+                      >
+                        {isOver ? "Drop task here" : "No tasks"}
                       </div>
-                    );
-                  })}
-                  {colTasks.length === 0 && (
-                    <div style={{ textAlign: "center", padding: "20px 0", color: "#50696e", fontSize: "11px" }}>
-                      No tasks
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

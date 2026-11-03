@@ -18,6 +18,188 @@ export type AdminRole =
   | "partnerships"
   | "viewer";
 
+export type RoleLevel = 1 | 2 | 3 | 4 | 5;
+
+export type RoleDefinition = {
+  key: AdminRole;
+  level: RoleLevel;
+  levelName: string;
+  title: string;
+  description: string;
+  defaultScope: AdminScope;
+  canManageAllProjects: boolean;
+  canManageAllStaff: boolean;
+  canManageSystem: boolean;
+};
+
+export const ROLE_DEFINITIONS: Record<AdminRole, RoleDefinition> = {
+  super_admin: {
+    key: "super_admin",
+    level: 1,
+    levelName: "Level 1: Supreme Authority",
+    title: "Super Administrator",
+    description: "Supreme organisation-wide authority. Unrestricted governance across all modules, accounts, projects, communications, settings and security.",
+    defaultScope: "all",
+    canManageAllProjects: true,
+    canManageAllStaff: true,
+    canManageSystem: true,
+  },
+  executive_administrator: {
+    key: "executive_administrator",
+    level: 2,
+    levelName: "Level 2: Administrator",
+    title: "Executive Administrator",
+    description: "Operations and administration oversight under Super Admin direction. Staff management, announcements and organizational reporting.",
+    defaultScope: "all",
+    canManageAllProjects: true,
+    canManageAllStaff: true,
+    canManageSystem: false,
+  },
+  technical_administrator: {
+    key: "technical_administrator",
+    level: 2,
+    levelName: "Level 2: Administrator",
+    title: "Technical Administrator",
+    description: "Technical infrastructure, project systems, innovation submissions, and developer tooling governance.",
+    defaultScope: "all",
+    canManageAllProjects: true,
+    canManageAllStaff: false,
+    canManageSystem: false,
+  },
+  department_head: {
+    key: "department_head",
+    level: 3,
+    levelName: "Level 3: Department Head",
+    title: "Department Head",
+    description: "Departmental leadership overseeing departmental staff, assigning departmental tasks, and publishing departmental notices.",
+    defaultScope: "all",
+    canManageAllProjects: false,
+    canManageAllStaff: false,
+    canManageSystem: false,
+  },
+  project_manager: {
+    key: "project_manager",
+    level: 4,
+    levelName: "Level 4: Project Manager",
+    title: "Project Manager",
+    description: "Responsible for managing assigned projects, timelines, task assignment, progress reporting and Kanban delivery.",
+    defaultScope: "all",
+    canManageAllProjects: false,
+    canManageAllStaff: false,
+    canManageSystem: false,
+  },
+  staff_member: {
+    key: "staff_member",
+    level: 5,
+    levelName: "Level 5: Staff Member",
+    title: "Staff Member",
+    description: "Full participant in internal organizational collaboration, direct peer messaging, tasks, projects and announcements.",
+    defaultScope: "all",
+    canManageAllProjects: false,
+    canManageAllStaff: false,
+    canManageSystem: false,
+  },
+  developer: {
+    key: "developer",
+    level: 5,
+    levelName: "Level 5: Staff Member",
+    title: "Software Developer",
+    description: "Engineering and software development, code contributions, task execution and cross-department peer communication.",
+    defaultScope: "all",
+    canManageAllProjects: false,
+    canManageAllStaff: false,
+    canManageSystem: false,
+  },
+  business_development: {
+    key: "business_development",
+    level: 5,
+    levelName: "Level 5: Staff Member",
+    title: "Business Development Officer",
+    description: "Partnership management, external opportunities and client relations.",
+    defaultScope: "enquiry",
+    canManageAllProjects: false,
+    canManageAllStaff: false,
+    canManageSystem: false,
+  },
+  marketing_and_communications: {
+    key: "marketing_and_communications",
+    level: 5,
+    levelName: "Level 5: Staff Member",
+    title: "Marketing & Communications Officer",
+    description: "Public publications, event marketing, external storytelling and social engagement.",
+    defaultScope: "all",
+    canManageAllProjects: false,
+    canManageAllStaff: false,
+    canManageSystem: false,
+  },
+  research_and_innovation: {
+    key: "research_and_innovation",
+    level: 5,
+    levelName: "Level 5: Staff Member",
+    title: "Research & Innovation Specialist",
+    description: "Applied research, prototyping, technical evaluation and community idea intake.",
+    defaultScope: "all",
+    canManageAllProjects: false,
+    canManageAllStaff: false,
+    canManageSystem: false,
+  },
+  content_manager: {
+    key: "content_manager",
+    level: 5,
+    levelName: "Level 5: Staff Member",
+    title: "Content Manager",
+    description: "Articles, tutorials, technical writing and documentation maintenance.",
+    defaultScope: "all",
+    canManageAllProjects: false,
+    canManageAllStaff: false,
+    canManageSystem: false,
+  },
+  operations: {
+    key: "operations",
+    level: 5,
+    levelName: "Level 5: Staff Member",
+    title: "Operations Officer",
+    description: "Logistics, community member registry and operational workflows.",
+    defaultScope: "all",
+    canManageAllProjects: false,
+    canManageAllStaff: false,
+    canManageSystem: false,
+  },
+  careers: {
+    key: "careers",
+    level: 5,
+    levelName: "Level 5: Staff Member",
+    title: "Talent & Careers Officer",
+    description: "Recruitment intake, career opportunities and emerging talent pipelines.",
+    defaultScope: "career",
+    canManageAllProjects: false,
+    canManageAllStaff: false,
+    canManageSystem: false,
+  },
+  partnerships: {
+    key: "partnerships",
+    level: 5,
+    levelName: "Level 5: Staff Member",
+    title: "Partnerships Lead",
+    description: "Collaborations with academic, industry and community organizations.",
+    defaultScope: "partnership",
+    canManageAllProjects: false,
+    canManageAllStaff: false,
+    canManageSystem: false,
+  },
+  viewer: {
+    key: "viewer",
+    level: 5,
+    levelName: "Level 5: Staff Member",
+    title: "Read-only Viewer",
+    description: "Audit and review observer with read-only access to assigned materials.",
+    defaultScope: "all",
+    canManageAllProjects: false,
+    canManageAllStaff: false,
+    canManageSystem: false,
+  },
+};
+
 export type AdminScope = "all" | "enquiry" | "career" | "partnership";
 
 export type AdminSession = {

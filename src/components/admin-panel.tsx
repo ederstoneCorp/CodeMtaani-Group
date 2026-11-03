@@ -5,6 +5,7 @@ import {
   BarChart3,
   BookOpen,
   Calendar,
+  Crown,
   FileSpreadsheet,
   FolderGit2,
   Inbox,
@@ -24,6 +25,8 @@ import { AdminAnalyticsView } from "./admin-analytics-view";
 import { AdminKanbanView } from "./admin-kanban-view";
 import { AdminCommunicationView } from "./admin-communication-view";
 import { AdminPortalSubmissionsView } from "./admin-portal-submissions-view";
+import { AdminRolesPanel } from "./admin-roles-panel";
+import { safeFetchJson } from "@/lib/safe-fetch";
 
 type Submission = {
   id: string;
@@ -111,7 +114,7 @@ type TeamItem = {
 };
 
 export function AdminPanel() {
-  const [tab, setTab] = useState<"overview" | "submissions" | "members" | "projects" | "articles" | "events" | "team" | "communication">("overview");
+  const [tab, setTab] = useState<"overview" | "submissions" | "members" | "projects" | "articles" | "events" | "team" | "communication" | "roles">("overview");
   const [projSubTab, setProjSubTab] = useState<"kanban" | "list">("kanban");
   const [subsSubTab, setSubsSubTab] = useState<"portal" | "enquiries">("portal");
 
@@ -211,14 +214,9 @@ export function AdminPanel() {
 
   // Load KPI Stats
   const loadStats = useCallback(async () => {
-    try {
-      const res = await fetch("/api/admin/stats", { cache: "no-store" });
-      if (res.ok) {
-        const data = await res.json();
-        setStats(data);
-      }
-    } catch {
-      // Non-blocking
+    const res = await safeFetchJson<Stats>("/api/admin/stats");
+    if (res.ok && res.data) {
+      setStats(res.data);
     }
   }, []);
 
@@ -227,82 +225,63 @@ export function AdminPanel() {
     async (signal?: AbortSignal) => {
       setLoading(true);
       setError("");
-      try {
-        const p = new URLSearchParams();
-        if (subType) p.set("type", subType);
-        if (subStatus) p.set("status", subStatus);
-        if (subSearch) p.set("q", subSearch);
-        const r = await fetch("/api/admin/submissions?" + p, { signal, cache: "no-store" });
-        if (r.status === 401) {
-          window.location.href = "/admin/login";
-          return;
-        }
-        const d = await r.json();
-        if (!r.ok) throw new Error(d.error || "Unable to load submissions.");
-        setItems(d.submissions || []);
-        setCounts(d.counts || []);
-      } catch (e) {
-        if (e instanceof Error && e.name !== "AbortError") setError(e.message);
-      } finally {
-        if (!signal?.aborted) setLoading(false);
+      const p = new URLSearchParams();
+      if (subType) p.set("type", subType);
+      if (subStatus) p.set("status", subStatus);
+      if (subSearch) p.set("q", subSearch);
+      const res = await safeFetchJson<{ submissions: Submission[]; counts: Counts[] }>(
+        "/api/admin/submissions?" + p.toString(),
+        { signal }
+      );
+      if (res.ok && res.data) {
+        setItems(res.data.submissions || []);
+        setCounts(res.data.counts || []);
+      } else if (res.error) {
+        setError(res.error);
       }
+      setLoading(false);
     },
     [subType, subStatus, subSearch]
   );
 
   // Load Projects
   const loadProjects = useCallback(async () => {
-    try {
-      const r = await fetch("/api/admin/projects");
-      if (r.ok) {
-        const d = await r.json();
-        setProjects(d.projects || []);
-      }
-    } catch {}
+    const res = await safeFetchJson<{ projects: ProjectItem[] }>("/api/admin/projects");
+    if (res.ok && res.data) {
+      setProjects(res.data.projects || []);
+    }
   }, []);
 
   // Load Members
   const loadMembers = useCallback(async () => {
-    try {
-      const r = await fetch("/api/admin/members");
-      if (r.ok) {
-        const d = await r.json();
-        setMembers(d.members || []);
-      }
-    } catch {}
+    const res = await safeFetchJson<{ members: MemberItem[] }>("/api/admin/members");
+    if (res.ok && res.data) {
+      setMembers(res.data.members || []);
+    }
   }, []);
 
   // Load Articles
   const loadArticles = useCallback(async () => {
-    try {
-      const r = await fetch("/api/admin/articles");
-      if (r.ok) {
-        const d = await r.json();
-        setArticles(d.articles || []);
-      }
-    } catch {}
+    const res = await safeFetchJson<{ articles: ArticleItem[] }>("/api/admin/articles");
+    if (res.ok && res.data) {
+      setArticles(res.data.articles || []);
+    }
   }, []);
 
   // Load Events
   const loadEvents = useCallback(async () => {
-    try {
-      const r = await fetch("/api/admin/events");
-      if (r.ok) {
-        const d = await r.json();
-        setEvents(d.events || []);
-      }
-    } catch {}
+    const res = await safeFetchJson<{ events: EventItem[] }>("/api/admin/events");
+    if (res.ok && res.data) {
+      setEvents(res.data.events || []);
+    }
   }, []);
 
   // Load Team
   const loadTeam = useCallback(async () => {
-    try {
-      const r = await fetch("/api/admin/team");
-      if (r.ok) {
-        const d = await r.json();
-        setTeam(d.members || []);
-      }
-    } catch {}
+    const res = await safeFetchJson<{ members: TeamItem[] }>("/api/admin/team");
+    if (res.ok && res.data) {
+      setTeam(res.data.members || []);
+    }
   }, []);
 
   // Trigger loads based on active tab
@@ -357,25 +336,23 @@ export function AdminPanel() {
   async function handleCreateProject(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
-    try {
-      const r = await fetch("/api/admin/projects", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: newProjTitle,
-          slug: newProjTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-          description: newProjDesc,
-          category: newProjCategory,
-          technologies: newProjTech.split(",").map((s) => s.trim()).filter(Boolean),
-          github_url: newProjGithub || null,
-          image_url: newProjImage || null,
-          status: "in_development",
-        }),
-      });
-      if (!r.ok) {
-        const d = await r.json();
-        throw new Error(d.error || "Failed to create project");
-      }
+    const res = await safeFetchJson("/api/admin/projects", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: newProjTitle,
+        slug: newProjTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+        description: newProjDesc,
+        category: newProjCategory,
+        technologies: newProjTech.split(",").map((s) => s.trim()).filter(Boolean),
+        github_url: newProjGithub || null,
+        image_url: newProjImage || null,
+        status: "in_development",
+      }),
+    });
+    if (!res.ok) {
+      setError(res.error || "Failed to create project");
+    } else {
       setShowNewProject(false);
       setNewProjTitle("");
       setNewProjDesc("");
@@ -384,35 +361,30 @@ export function AdminPanel() {
       setNewProjImage(null);
       await loadProjects();
       await loadStats();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create project");
-    } finally {
-      setBusy(false);
     }
+    setBusy(false);
   }
 
   // Create Article
   async function handleCreateArticle(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
-    try {
-      const r = await fetch("/api/admin/articles", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: newArtTitle,
-          slug: newArtTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-          excerpt: newArtExcerpt,
-          content: newArtContent,
-          category: newArtCategory,
-          cover_image: newArtCover,
-          status: "published",
-        }),
-      });
-      if (!r.ok) {
-        const d = await r.json();
-        throw new Error(d.error || "Failed to create article");
-      }
+    const res = await safeFetchJson("/api/admin/articles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: newArtTitle,
+        slug: newArtTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+        excerpt: newArtExcerpt,
+        content: newArtContent,
+        category: newArtCategory,
+        cover_image: newArtCover,
+        status: "published",
+      }),
+    });
+    if (!res.ok) {
+      setError(res.error || "Failed to create article");
+    } else {
       setShowNewArticle(false);
       setNewArtTitle("");
       setNewArtExcerpt("");
@@ -420,99 +392,81 @@ export function AdminPanel() {
       setNewArtCover(null);
       await loadArticles();
       await loadStats();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create article");
-    } finally {
-      setBusy(false);
     }
+    setBusy(false);
   }
 
   // Delete Article
   async function handleDeleteArticle(id: string) {
     setBusy(true);
     setError("");
-    try {
-      const r = await fetch(`/api/admin/articles?id=${id}`, { method: "DELETE" });
-      if (!r.ok) {
-        const d = await r.json();
-        throw new Error(d.error || "Failed to delete article");
-      }
+    const res = await safeFetchJson(`/api/admin/articles?id=${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      setError(res.error || "Failed to delete article");
+    } else {
       setDeleteConfirmId(null);
       await loadArticles();
       await loadStats();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete article");
-    } finally {
-      setBusy(false);
     }
+    setBusy(false);
   }
 
   // Create Event
   async function handleCreateEvent(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
-    try {
-      const r = await fetch("/api/admin/events", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: newEvTitle,
-          slug: newEvTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-          description: newEvDesc,
-          event_type: newEvType,
-          start_time: newEvTime,
-          is_virtual: newEvVirtual,
-          status: "upcoming",
-        }),
-      });
-      if (!r.ok) {
-        const d = await r.json();
-        throw new Error(d.error || "Failed to create event");
-      }
+    const res = await safeFetchJson("/api/admin/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: newEvTitle,
+        slug: newEvTitle.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+        description: newEvDesc,
+        event_type: newEvType,
+        start_time: newEvTime,
+        is_virtual: newEvVirtual,
+        status: "upcoming",
+      }),
+    });
+    if (!res.ok) {
+      setError(res.error || "Failed to create event");
+    } else {
       setShowNewEvent(false);
       setNewEvTitle("");
       setNewEvDesc("");
       setNewEvTime("");
       await loadEvents();
       await loadStats();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create event");
-    } finally {
-      setBusy(false);
     }
+    setBusy(false);
   }
 
   // Create Team Member
   async function handleCreateTeam(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
-    try {
-      const r = await fetch("/api/admin/team", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          full_name: newTeamName,
-          role_title: newTeamRole,
-          department: newTeamDept,
-          avatar_url: newTeamAvatar || null,
-          is_active: true,
-        }),
-      });
-      if (!r.ok) {
-        const d = await r.json();
-        throw new Error(d.error || "Failed to create team member");
-      }
+    const res = await safeFetchJson("/api/admin/team", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        full_name: newTeamName,
+        role_title: newTeamRole,
+        department: newTeamDept,
+        avatar_url: newTeamAvatar || null,
+        is_active: true,
+      }),
+    });
+    if (!res.ok) {
+      setError(res.error || "Failed to create team member");
+    } else {
       setShowNewTeam(false);
       setNewTeamName("");
       setNewTeamRole("");
       setNewTeamAvatar(null);
       await loadTeam();
       await loadStats();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create team member");
-    } finally {
-      setBusy(false);
     }
+    setBusy(false);
   }
 
   // Member status toggle
@@ -725,6 +679,26 @@ export function AdminPanel() {
         <div style={{ marginTop: "auto", borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: "16px", display: "flex", flexDirection: "column", gap: "6px" }}>
           {permissions.manageStaff && (
             <>
+              <button
+                type="button"
+                onClick={() => setTab("roles")}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  padding: "8px 12px",
+                  borderRadius: "4px",
+                  background: tab === "roles" ? "rgba(69,200,216,0.15)" : "transparent",
+                  color: tab === "roles" ? "#45c8d8" : "#8fa5a9",
+                  border: 0,
+                  cursor: "pointer",
+                  textAlign: "left",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                }}
+              >
+                <Crown size={15} /> Role Governance
+              </button>
               <a
                 href="/admin/staff"
                 style={{
@@ -794,6 +768,7 @@ export function AdminPanel() {
               {tab === "articles" && "Content & Blog CMS"}
               {tab === "events" && "Events & Workshops"}
               {tab === "team" && "Team Profiles"}
+              {tab === "roles" && "Organizational Role Governance & Authority Structure"}
             </h1>
           </div>
 
@@ -1632,6 +1607,13 @@ export function AdminPanel() {
                 <p className="admin-empty">No team profiles added yet.</p>
               )}
             </div>
+          </div>
+        )}
+
+        {/* ROLE GOVERNANCE TAB */}
+        {tab === "roles" && (
+          <div>
+            <AdminRolesPanel />
           </div>
         )}
       </section>
