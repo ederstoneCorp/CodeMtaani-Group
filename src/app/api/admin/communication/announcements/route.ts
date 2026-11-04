@@ -8,9 +8,10 @@ export const runtime = "nodejs";
 
 export async function GET() {
   const session = await getAdminSession();
-  if (!session || !session.id) return NextResponse.json({ error: "Unauthorised." }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Unauthorised." }, { status: 401 });
 
   try {
+    // Legacy Super Admin sessions are valid but do not have an admin_users row.
     const announcements = await getAnnouncements(session.id, session.department, session.role);
     return NextResponse.json({ announcements }, { headers: { "Cache-Control": "no-store, private" } });
   } catch (error) {
@@ -21,7 +22,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   const session = await getAdminSession();
-  if (!session || !session.id) return NextResponse.json({ error: "Unauthorised." }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Unauthorised." }, { status: 401 });
   if (!canManageAnnouncements(session)) return NextResponse.json({ error: "Forbidden." }, { status: 403 });
 
   try {
@@ -61,7 +62,10 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   const session = await getAdminSession();
-  if (!session || !session.id) return NextResponse.json({ error: "Unauthorised." }, { status: 401 });
+  if (!session) return NextResponse.json({ error: "Unauthorised." }, { status: 401 });
+  // Legacy Super Admin accounts have no staff UUID, so reading is allowed but
+  // per-user read receipts cannot be recorded for that session.
+  if (!session.id) return NextResponse.json({ ok: false, message: "Read receipts require a staff account." });
 
   try {
     const body = await request.json();
