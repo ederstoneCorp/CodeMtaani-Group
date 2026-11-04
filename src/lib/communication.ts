@@ -231,10 +231,10 @@ export async function createAnnouncement(data: {
   return r.rows[0];
 }
 
-export async function getAnnouncements(userId: string, department?: string | null, role?: string | null): Promise<Announcement[]> {
+export async function getAnnouncements(userId: string | null, department?: string | null, role?: string | null): Promise<Announcement[]> {
   const r = await query<Announcement>(
     `SELECT a.*, u.full_name AS author_name, u.staff_number AS author_staff_number,
-            EXISTS (SELECT 1 FROM announcement_reads r WHERE r.announcement_id = a.id AND r.user_id = $1) AS is_read
+            EXISTS (SELECT 1 FROM announcement_reads r WHERE r.announcement_id = a.id AND $1::uuid IS NOT NULL AND r.user_id = $1::uuid) AS is_read
      FROM internal_announcements a
      LEFT JOIN admin_users u ON u.id = a.created_by
      WHERE (a.target_department IS NULL OR a.target_department = '' OR a.target_department = $2)
