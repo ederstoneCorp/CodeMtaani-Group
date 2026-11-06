@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/admin-auth";
+import { query } from "@/lib/db";
 import { getConversationContacts, getDirectMessages, sendDirectMessage } from "@/lib/communication";
 import { createNotification } from "@/lib/notifications";
 
@@ -41,6 +42,20 @@ export async function POST(request: NextRequest) {
 
     if (!recipientId || !/^[0-9a-f-]{36}$/i.test(recipientId) || !content) {
       return NextResponse.json({ error: "Recipient and message content are required." }, { status: 400 });
+    }
+    if (recipientId === session.id) {
+      return NextResponse.json({ error: "You cannot send a direct message to your own account." }, { status: 400 });
+    }
+    if (content.length > 10000) {
+      return NextResponse.json({ error: "Message is too long. Maximum length is 10,000 characters." }, { status: 400 });
+    }
+
+    const recipient = await query<{ id: string }>(
+      "SELECT id FROM admin_users WHERE id = $1 AND active = TRUE LIMIT 1",
+      [recipientId]
+    );
+    if (!recipient.rows.length) {
+      return NextResponse.json({ error: "This staff account is unavailable or inactive." }, { status: 404 });
     }
 
     const message = await sendDirectMessage(session.id, recipientId, content, attachmentUrl);
