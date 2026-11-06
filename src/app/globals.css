@@ -270,3 +270,201 @@ select option:hover {
     animation: none !important;
   }
 }
+
+
+/* ==========================================================================
+   CODEMTAANI MOTION SYSTEM
+   Subtle, purposeful motion across public pages and the admin workspace.
+   ========================================================================== */
+
+:root {
+  --motion-ease: cubic-bezier(.22, 1, .36, 1);
+  --motion-fast: 180ms;
+  --motion-medium: 420ms;
+  --motion-slow: 760ms;
+}
+
+html { scroll-behavior: smooth; }
+body { overflow-x: clip; }
+
+.page-transition-wrapper {
+  animation: cm-page-enter 420ms var(--motion-ease) both;
+  transform-origin: 50% 0;
+}
+
+@keyframes cm-page-enter {
+  from { opacity: .72; transform: translate3d(0, 9px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+/* Scroll reveal: elements remain visible if JavaScript/observers are unavailable. */
+.motion-reveal {
+  opacity: 0;
+  transform: translate3d(0, 26px, 0);
+  transition:
+    opacity 680ms var(--motion-ease),
+    transform 680ms var(--motion-ease);
+  transition-delay: var(--motion-delay, 0ms);
+  will-change: opacity, transform;
+}
+.motion-reveal.motion-visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+}
+
+/* Hero atmosphere */
+.home-hero { isolation: isolate; }
+.hero-grid-pattern {
+  animation: cm-grid-drift 34s linear infinite;
+  transform-origin: center;
+}
+.hero-orbit { transform-origin: center; will-change: transform; }
+.orbit-one { animation: cm-orbit-breathe 13s ease-in-out infinite alternate; }
+.orbit-two { animation: cm-orbit-breathe 17s ease-in-out infinite alternate-reverse; }
+.hero-glow {
+  animation: cm-glow-pulse 9s ease-in-out infinite alternate;
+}
+.hero-kicker > span {
+  animation: cm-status-pulse 2.4s ease-in-out infinite;
+}
+.hero-aside {
+  animation: cm-float 8s ease-in-out infinite;
+}
+.hero-period { display: inline-block; animation: cm-period-glow 3s ease-in-out infinite; }
+
+@keyframes cm-grid-drift {
+  from { background-position: 0 0; }
+  to { background-position: 72px 72px; }
+}
+@keyframes cm-orbit-breathe {
+  from { transform: rotate(-5deg) scale(.985); }
+  to { transform: rotate(5deg) scale(1.025); }
+}
+@keyframes cm-glow-pulse {
+  from { opacity: .48; transform: scale(.92); }
+  to { opacity: .9; transform: scale(1.08); }
+}
+@keyframes cm-status-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(224,0,0,.42); }
+  50% { box-shadow: 0 0 0 8px rgba(224,0,0,0); }
+}
+@keyframes cm-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-9px); }
+}
+@keyframes cm-period-glow {
+  0%, 100% { text-shadow: 0 0 0 rgba(72,198,212,0); }
+  50% { text-shadow: 0 0 22px rgba(72,198,212,.55); }
+}
+
+/* Interactive surfaces */
+.division-tile,
+.info-card,
+.principle-grid article,
+.capability-list article,
+.text-rows article,
+.ecosystem-links a,
+.application-panel,
+.contact-options a,
+.admin-stats article,
+.admin-submission,
+.admin-list,
+.admin-detail {
+  transition:
+    transform 260ms var(--motion-ease),
+    border-color 260ms ease,
+    background-color 260ms ease,
+    box-shadow 260ms ease;
+}
+.division-tile:hover,
+.info-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 18px 42px rgba(0,0,0,.18);
+}
+.principle-grid article:hover,
+.capability-list article:hover,
+.text-rows article:hover,
+.ecosystem-links a:hover,
+.contact-options a:hover {
+  transform: translateX(5px);
+}
+.admin-stats article:hover,
+.admin-list:hover,
+.admin-detail:hover {
+  border-color: rgba(69,200,216,.42);
+}
+.admin-stats article:hover { transform: translateY(-3px); }
+.admin-submission:hover { transform: translateX(3px); }
+
+.button-primary,
+.button-dark,
+.nav-cta,
+.admin-button,
+.mobile-nav summary {
+  transition:
+    transform 220ms var(--motion-ease),
+    box-shadow 220ms ease,
+    background-color 220ms ease,
+    border-color 220ms ease,
+    color 220ms ease;
+}
+.button-primary:hover,
+.button-dark:hover,
+.nav-cta:hover,
+.admin-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 26px rgba(0,0,0,.2);
+}
+.button-primary:active,
+.button-dark:active,
+.nav-cta:active,
+.admin-button:active {
+  transform: translateY(0) scale(.98);
+}
+a:focus-visible,
+button:focus-visible,
+summary:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #48c6d4;
+  outline-offset: 3px;
+}
+
+/* Dialogs and menus */
+[role="dialog"],
+.admin-modal,
+.admin-auth-card {
+  animation: cm-panel-enter 320ms var(--motion-ease) both;
+}
+@keyframes cm-panel-enter {
+  from { opacity: 0; transform: translate3d(0, 12px, 0) scale(.985); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+.mobile-nav nav { transform-origin: top right; }
+
+/* Keep animation workload low on smaller screens. */
+@media (max-width: 640px) {
+  .orbit-one { animation-duration: 20s; }
+  .orbit-two { animation-duration: 24s; }
+  .hero-aside { animation: none; }
+  .motion-reveal { transform: translate3d(0, 16px, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+  .motion-reveal,
+  .motion-reveal.motion-visible {
+    opacity: 1 !important;
+    transform: none !important;
+    will-change: auto !important;
+  }
+  .page-transition-wrapper { animation: none !important; }
+}
