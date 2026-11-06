@@ -468,3 +468,250 @@ textarea:focus-visible {
   }
   .page-transition-wrapper { animation: none !important; }
 }
+
+
+/* ==========================================================================
+   CODEMTAANI CORPORATE COLOUR MOTION
+   A stronger cyan/teal identity with restrained red retained as a secondary
+   signal colour. Motion is slow, deliberate and never reduces readability.
+   ========================================================================== */
+:root {
+  --cm-cyan: #58d5e5;
+  --cm-teal: #20b9b5;
+  --cm-ice: #d9fbff;
+  --cm-deep: #042a31;
+  --cm-red: #e00000;
+}
+
+/* Slow colour movement on the brand's highlighted words, not every paragraph. */
+.hero-copy .display > span:first-of-type,
+.intro-main .section-title span,
+.section-heading-row .section-title span,
+.approach-heading .section-title span,
+.ecosystem-layout .section-title span,
+.services-lead .section-title span,
+.contact-banner .section-title span {
+  background: linear-gradient(105deg, var(--cm-cyan) 0%, #8ce8e4 28%, #ffffff 52%, var(--cm-teal) 76%, var(--cm-cyan) 100%);
+  background-size: 240% 100%;
+  background-position: 0% 50%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: cm-brand-text-flow 8s ease-in-out infinite;
+}
+.hero-period {
+  color: var(--cm-cyan);
+  -webkit-text-fill-color: var(--cm-cyan);
+  animation: cm-accent-breathe 4.5s ease-in-out infinite;
+}
+@keyframes cm-brand-text-flow {
+  0%, 100% { background-position: 0% 50%; filter: drop-shadow(0 0 0 rgba(88,213,229,0)); }
+  50% { background-position: 100% 50%; filter: drop-shadow(0 0 12px rgba(88,213,229,.22)); }
+}
+@keyframes cm-accent-breathe {
+  0%, 100% { color: #58d5e5; text-shadow: 0 0 5px rgba(88,213,229,.12); }
+  50% { color: #a4f3ed; text-shadow: 0 0 20px rgba(88,213,229,.48); }
+}
+
+/* Brand colour appears as a soft moving light across hero and section surfaces. */
+.home-hero {
+  background: linear-gradient(118deg, #042a31 0%, #063b45 48%, #07333d 100%);
+  background-size: 220% 220%;
+  animation: cm-hero-colour-wash 18s ease-in-out infinite alternate;
+}
+@keyframes cm-hero-colour-wash {
+  0% { background-position: 0% 40%; }
+  100% { background-position: 100% 60%; }
+}
+.hero-glow {
+  background: linear-gradient(135deg, rgba(32,185,181,.36), rgba(88,213,229,.18), rgba(224,0,0,.08));
+  filter: blur(95px);
+}
+.hero-orbit.orbit-one { border-color: rgba(88,213,229,.48); }
+.hero-orbit.orbit-two { border-color: rgba(32,185,181,.42); }
+
+/* Eyebrows and small labels carry a quiet brand tint shift. */
+.eyebrow,
+.hero-kicker,
+.card-number,
+.tile-top,
+.capability-list article > span {
+  transition: color 300ms ease;
+}
+.eyebrow { color: #83e4e9; }
+.info-card:hover .card-number,
+.division-tile:hover .tile-top,
+.capability-list article:hover > span {
+  color: var(--cm-cyan);
+}
+
+/* Navigation and text links get a clear but controlled colour transition. */
+.desktop-nav a,
+.footer-grid > div > a,
+.hero-secondary,
+.text-link,
+.ecosystem-links a {
+  transition: color 240ms ease, transform 240ms ease;
+}
+.desktop-nav a:hover,
+.footer-grid > div > a:hover,
+.hero-secondary:hover,
+.text-link:hover,
+.ecosystem-links a:hover {
+  color: var(--cm-cyan);
+}
+.brand-logo {
+  border-color: rgba(88,213,229,.72);
+  box-shadow: 0 0 0 1px rgba(32,185,181,.18), 0 0 24px rgba(88,213,229,.18);
+  transition: border-color 300ms ease, box-shadow 300ms ease, transform 300ms var(--motion-ease);
+}
+.brand-lockup:hover .brand-logo {
+  border-color: #a4f3ed;
+  box-shadow: 0 0 0 1px rgba(32,185,181,.35), 0 0 30px rgba(88,213,229,.3);
+  transform: rotate(-3deg) scale(1.035);
+}
+
+/* Buttons shift between teal and cyan on hover; the resting state stays solid. */
+.button-primary,
+.nav-cta {
+  background: linear-gradient(110deg, #087d87, #20b9b5 55%, #58d5e5);
+  background-size: 180% 100%;
+  color: #03282e;
+  box-shadow: 0 7px 24px rgba(32,185,181,.12);
+  transition: background-position 350ms ease, transform 220ms var(--motion-ease), box-shadow 220ms ease;
+}
+.button-primary:hover,
+.nav-cta:hover {
+  background-position: 100% 50%;
+  background-color: #58d5e5;
+  color: #03282e;
+  box-shadow: 0 12px 30px rgba(32,185,181,.25);
+}
+.button-dark {
+  transition: background-color 240ms ease, color 240ms ease, transform 220ms var(--motion-ease), box-shadow 220ms ease;
+}
+.button-dark:hover {
+  background: #58d5e5;
+  color: #03282e;
+  box-shadow: 0 10px 28px rgba(88,213,229,.2);
+}
+
+/* Cards reveal a teal edge and a soft lift rather than flashing colours. */
+.division-tile,
+.info-card,
+.work-stream-card,
+.work-standard-grid article,
+.principle-grid article {
+  position: relative;
+  overflow: hidden;
+}
+.division-tile::before,
+.info-card::before,
+.work-stream-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: linear-gradient(180deg, transparent, var(--cm-cyan), var(--cm-teal), transparent);
+  opacity: 0;
+  transform: scaleY(.35);
+  transform-origin: center;
+  transition: opacity 300ms ease, transform 420ms var(--motion-ease);
+}
+.division-tile:hover::before,
+.info-card:hover::before,
+.work-stream-card:hover::before {
+  opacity: 1;
+  transform: scaleY(1);
+}
+.division-tile:hover,
+.info-card:hover,
+.work-stream-card:hover {
+  border-color: rgba(88,213,229,.34);
+  box-shadow: 0 18px 44px rgba(0,0,0,.2), 0 0 24px rgba(32,185,181,.08);
+}
+.work-stream-top,
+.work-standard-grid article > svg { color: var(--cm-cyan); }
+
+/* Contact band retains its strong red identity, with a moving cyan edge detail. */
+.contact-banner {
+  background: linear-gradient(115deg, #c90000 0%, #e00000 48%, #a90016 100%);
+  background-size: 200% 100%;
+  animation: cm-contact-colour-flow 16s ease-in-out infinite alternate;
+}
+@keyframes cm-contact-colour-flow {
+  from { background-position: 0% 50%; }
+  to { background-position: 100% 50%; }
+}
+.contact-banner::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #58d5e5, #a4f3ed, transparent);
+  background-size: 200% 100%;
+  animation: cm-edge-flow 5s linear infinite;
+}
+@keyframes cm-edge-flow {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
+/* Admin console: clearer cyan focus states and restrained live indicators. */
+.admin-heading .eyebrow,
+.admin-stats article:hover strong,
+.admin-detail a,
+.audit-event .audit-meta {
+  color: var(--cm-cyan);
+}
+.admin-button:not(.secondary) {
+  background: linear-gradient(110deg, #20b9b5, #58d5e5);
+  border-color: #58d5e5;
+  color: #03282e;
+}
+.admin-button:not(.secondary):hover {
+  box-shadow: 0 8px 24px rgba(88,213,229,.2);
+}
+.admin-stats article:hover {
+  background: linear-gradient(145deg, #132326, #101719);
+  box-shadow: 0 12px 30px rgba(32,185,181,.08);
+}
+.admin-page input:focus,
+.admin-page select:focus,
+.admin-page textarea:focus {
+  border-color: var(--cm-cyan);
+  box-shadow: 0 0 0 3px rgba(88,213,229,.14);
+}
+.admin-submission.active {
+  background: linear-gradient(90deg, rgba(32,185,181,.15), rgba(32,185,181,.035));
+  border-left-color: var(--cm-cyan);
+}
+
+/* Respect reduced-motion settings and avoid text animation on low-power contexts. */
+@media (prefers-reduced-motion: reduce) {
+  .home-hero,
+  .contact-banner,
+  .hero-copy .display > span:first-of-type,
+  .intro-main .section-title span,
+  .section-heading-row .section-title span,
+  .approach-heading .section-title span,
+  .ecosystem-layout .section-title span,
+  .services-lead .section-title span,
+  .contact-banner .section-title span,
+  .hero-period,
+  .contact-banner::after {
+    animation: none !important;
+  }
+  .hero-copy .display > span:first-of-type,
+  .intro-main .section-title span,
+  .section-heading-row .section-title span,
+  .approach-heading .section-title span,
+  .ecosystem-layout .section-title span,
+  .services-lead .section-title span,
+  .contact-banner .section-title span {
+    background-position: 50% 50%;
+  }
+}
