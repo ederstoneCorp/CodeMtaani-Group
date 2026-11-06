@@ -26,6 +26,8 @@ export function AdminCommunicationView({ canAnnounce }: { canAnnounce: boolean }
   const [activePeer, setActivePeer] = useState<ConversationContact | null>(null);
   const [directMessages, setDirectMessages] = useState<DirectMessage[]>([]);
   const [dmInput, setDmInput] = useState("");
+  const [directMessageError, setDirectMessageError] = useState<string | null>(null);
+  const [sendingDirect, setSendingDirect] = useState(false);
   const [contactSearch, setContactSearch] = useState("");
   const [messageSearch, setMessageSearch] = useState("");
   const [attachedUrl, setAttachedUrl] = useState<string | null>(null);
@@ -176,29 +178,43 @@ export function AdminCommunicationView({ canAnnounce }: { canAnnounce: boolean }
     }
   }
 
-  // Send Direct Message
+  // Send Direct Message. Keep the draft until the server confirms delivery.
   async function handleSendDirect(e: FormEvent) {
     e.preventDefault();
-    if (!activePeer || (!dmInput.trim() && !attachedUrl)) return;
-    const text = dmInput;
+    if (sendingDirect || !activePeer || (!dmInput.trim() && !attachedUrl)) return;
+
+    const peer = activePeer;
+    const text = dmInput.trim();
     const fileUrl = attachedUrl;
-    setDmInput("");
-    setAttachedUrl(null);
-    setAttachedName(null);
+    const fileName = attachedName;
+    setDirectMessageError(null);
+    setSendingDirect(true);
 
-    const res = await safeFetchJson("/api/admin/communication/direct", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        recipientId: activePeer.id,
-        content: text || `[Shared attachment: ${attachedName || "File"}]`,
-        attachmentUrl: fileUrl,
-      }),
-    });
+    try {
+      const res = await safeFetchJson<{ message: DirectMessage }>("/api/admin/communication/direct", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          recipientId: peer.id,
+          content: text || `[Shared attachment: ${fileName || "File"}]`,
+          attachmentUrl: fileUrl,
+        }),
+      });
 
-    if (res.ok) {
-      await loadDirectMessages(activePeer.id);
+      if (!res.ok) {
+        setDirectMessageError(res.error || "The message could not be sent. Your draft has been kept.");
+        return;
+      }
+
+      setDmInput("");
+      setAttachedUrl(null);
+      setAttachedName(null);
+      await loadDirectMessages(peer.id);
       await loadContacts();
+    } catch (error) {
+      setDirectMessageError(error instanceof Error ? error.message : "The message could not be sent. Your draft has been kept.");
+    } finally {
+      setSendingDirect(false);
     }
   }
 
@@ -798,6 +814,21 @@ export function AdminCommunicationView({ canAnnounce }: { canAnnounce: boolean }
                 </div>
               )}
 
+              {directMessageError && (
+                <div
+                  role="alert"
+                  style={{
+                    padding: "8px 14px",
+                    background: "rgba(220,38,38,0.18)",
+                    borderTop: "1px solid rgba(248,113,113,0.3)",
+                    color: "#fca5a5",
+                    fontSize: "12px",
+                  }}
+                >
+                  {directMessageError}
+                </div>
+              )}
+
               {/* MESSAGE COMPOSER */}
               <form
                 onSubmit={handleSendDirect}
@@ -841,6 +872,7 @@ export function AdminCommunicationView({ canAnnounce }: { canAnnounce: boolean }
                 <input
                   value={dmInput}
                   onChange={(e) => setDmInput(e.target.value)}
+                  disabled={sendingDirect}
                   placeholder={
                     uploadingAttachment
                       ? "Uploading attachment..."
@@ -852,10 +884,11 @@ export function AdminCommunicationView({ canAnnounce }: { canAnnounce: boolean }
                 <button
                   className="admin-button"
                   type="submit"
-                  disabled={uploadingAttachment || (!dmInput.trim() && !attachedUrl)}
+                  disabled={uploadingAttachment || sendingDirect || (!dmInput.trim() && !attachedUrl)}
+                  aria-label={sendingDirect ? "Sending message" : "Send message"}
                   style={{ padding: "10px 16px" }}
                 >
-                  <Send size={14} />
+                  {sendingDirect ? <RefreshCw size={14} className="animate-spin" /> : <Send size={14} />}
                 </button>
               </form>
             </div>
