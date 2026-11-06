@@ -17,6 +17,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const email = String(body.email || "").trim().toLowerCase();
     const password = String(body.password || "");
+    const requestedNext = typeof body.next === "string" ? body.next : "";
     const ip =
       request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
       request.headers.get("x-real-ip") ||
@@ -76,7 +77,10 @@ export async function POST(request: NextRequest) {
       console.error("Admin login audit failed:", error);
     }
 
-    const redirectUrl = session.mustChangePassword ? "/admin/change-password" : "/admin";
+    const safeNext = requestedNext.startsWith("/admin/") || requestedNext.startsWith("/admin?")
+      ? requestedNext
+      : "/admin";
+    const redirectUrl = session.mustChangePassword ? "/admin/change-password" : safeNext;
     const response = NextResponse.json({
       ok: true,
       role: session.role,
