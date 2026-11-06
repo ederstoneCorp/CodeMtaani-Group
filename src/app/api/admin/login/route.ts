@@ -5,7 +5,7 @@ import {
   createAdminToken,
   recordLoginAttempt,
   loginIsLimited,
-  verifyLegacyPassword,
+  provisionLegacySuperAdmin,
   audit,
   type AdminSession,
 } from "@/lib/admin-roles";
@@ -48,17 +48,12 @@ export async function POST(request: NextRequest) {
       console.error("Staff authentication unavailable:", error);
     }
 
-    if (!session && verifyLegacyPassword(email, password)) {
-      session = {
-        id: null,
-        email,
-        fullName: "Administrator",
-        role: "super_admin",
-        scope: "all",
-        mustChangePassword: false,
-        provisioningStatus: "active",
-        legacy: true,
-      };
+    if (!session) {
+      try {
+        session = await provisionLegacySuperAdmin(email, password);
+      } catch (error) {
+        console.error("Legacy administrator provisioning failed:", error);
+      }
     }
 
     try {
