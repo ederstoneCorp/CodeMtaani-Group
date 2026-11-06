@@ -115,6 +115,14 @@ type TeamItem = {
 
 export function AdminPanel() {
   const [tab, setTab] = useState<"overview" | "submissions" | "members" | "projects" | "articles" | "events" | "team" | "communication" | "roles">("overview");
+
+  // Restore a requested dashboard section after authentication or notification navigation.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requestedTab = params.get("tab");
+    const allowedTabs = ["overview", "submissions", "members", "projects", "articles", "events", "team", "communication", "roles"];
+    if (requestedTab && allowedTabs.includes(requestedTab)) setTab(requestedTab as typeof tab);
+  }, []);
   const [projSubTab, setProjSubTab] = useState<"kanban" | "list">("kanban");
   const [subsSubTab, setSubsSubTab] = useState<"portal" | "enquiries">("portal");
 
