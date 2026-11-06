@@ -63,7 +63,7 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
         const siblings = element.parentElement ? Array.from(element.parentElement.children) : [];
         const siblingIndex = Math.max(0, siblings.indexOf(element));
         element.setAttribute("data-motion-index", String(siblingIndex));
-        element.style.setProperty("--motion-delay", `${Math.min(siblingIndex, 5) * 65}ms`);
+        (element as HTMLElement).style.setProperty("--motion-delay", `${Math.min(siblingIndex, 5) * 65}ms`);
         observer?.observe(element);
       });
     };
