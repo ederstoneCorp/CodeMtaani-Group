@@ -278,6 +278,58 @@ export async function authenticateStaff(email: string, password: string): Promis
   };
 }
 
+export async function provisionLegacySuperAdmin(email: string, password: string): Promise<AdminSession | null> {
+  const normalizedEmail = email.trim().toLowerCase();
+  const configuredEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  const legacyHash = process.env.ADMIN_PASSWORD_HASH || "";
+
+  if (!configuredEmail || normalizedEmail !== configuredEmail || !verifyPassword(password, legacyHash)) {
+    return null;
+  }
+
+  // Never overwrite or elevate an existing account. Provision only when this
+  // legacy administrator has no database-backed identity yet.
+  const existing = await db().query(
+    "SELECT id, email, full_name, password_hash, role, scope, staff_number, department, must_change_password, provisioning_status, active FROM admin_users WHERE lower(email)=lower($1) LIMIT 1",
+    [normalizedEmail]
+  );
+
+  if (existing.rows.length === 0) {
+    await db().query(
+      `INSERT INTO admin_users (email, full_name, password_hash, role, scope, active)
+       VALUES ($1, 'Administrator', $2, 'super_admin', 'all', TRUE)
+       ON CONFLICT DO NOTHING`,
+      [normalizedEmail, legacyHash]
+    );
+  }
+
+  // Re-read after insert to handle concurrent first-time logins safely.
+  const result = await db().query(
+    `SELECT id, email, full_name, password_hash, role, scope, staff_number, department,
+            must_change_password, provisioning_status, active
+     FROM admin_users WHERE lower(email)=lower($1) LIMIT 1`,
+    [normalizedEmail]
+  );
+  const row = result.rows[0];
+  if (!row || !row.active || row.role !== "super_admin" || !verifyPassword(password, row.password_hash)) {
+    return null;
+  }
+
+  await db().query("UPDATE admin_users SET last_login_at=NOW() WHERE id=$1", [row.id]);
+  return {
+    id: row.id,
+    email: row.email,
+    fullName: row.full_name,
+    role: row.role,
+    scope: row.scope,
+    staffNumber: row.staff_number || null,
+    department: row.department || null,
+    mustChangePassword: Boolean(row.must_change_password),
+    provisioningStatus: row.provisioning_status || "active",
+    legacy: false,
+  };
+}
+
 export async function getAdminSession(): Promise<AdminSession | null> {
   try {
     const { cookies } = await import("next/headers");
@@ -291,19 +343,9 @@ export async function getAdminSession(): Promise<AdminSession | null> {
     if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
     const data = JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as AdminSession & { exp: number };
     if (!data.email || data.exp <= Date.now()) return null;
-    if (data.legacy) {
-      if (data.email !== process.env.ADMIN_EMAIL?.trim().toLowerCase()) return null;
-      return {
-        id: null,
-        email: data.email,
-        fullName: "Administrator",
-        role: "super_admin",
-        scope: "all",
-        mustChangePassword: false,
-        provisioningStatus: "active",
-        legacy: true,
-      };
-    }
+    // Legacy null-ID sessions are no longer accepted. All administrators
+    // must resolve to a persistent admin_users row.
+    if (data.legacy) return null;
     if (!data.id) return null;
     const result = await db().query(
       `SELECT id, email, full_name, role, scope, staff_number, department,
