@@ -145,9 +145,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Authorization: Only super_admin can create another super_admin
-    if (role === "super_admin" && session.role !== "super_admin") {
-      return NextResponse.json({ error: "Only a Super Admin can create another Super Admin account." }, { status: 403 });
+    // Only the Super Admin may provision Level 1 or Level 2 administrators.
+    // Executive Administrators can manage ordinary staff, but cannot create peers
+    // or higher-authority administrator accounts.
+    if (["super_admin", "executive_administrator", "technical_administrator"].includes(role) && session.role !== "super_admin") {
+      return NextResponse.json({ error: "Only the Super Admin can create administrator-level accounts." }, { status: 403 });
     }
 
     // Explicit Check: Does an account with this normalized email already exist?
@@ -327,6 +329,24 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Invalid staff ID format." }, { status: 400 });
     }
 
+    const targetResult = await query<{ id: string; role: string; scope: string }>(
+      "SELECT id, role, scope FROM admin_users WHERE id = $1 LIMIT 1",
+      [id]
+    );
+    const target = targetResult.rows[0];
+    if (!target) return NextResponse.json({ error: "Staff account not found." }, { status: 404 });
+
+    // Executive Administrators cannot alter another administrator-level account.
+    if (session.role !== "super_admin" && ["super_admin", "executive_administrator", "technical_administrator"].includes(target.role)) {
+      return NextResponse.json({ error: "Only the Super Admin can modify administrator-level accounts." }, { status: 403 });
+    }
+
+    const effectiveRole = body.role === undefined ? target.role : String(body.role).trim();
+    const effectiveScope = body.scope === undefined ? target.scope : String(body.scope).trim();
+    if (!isValidScopeForRole(effectiveRole, effectiveScope)) {
+      return NextResponse.json({ error: `Invalid scope "${effectiveScope}" for role "${effectiveRole}".` }, { status: 400 });
+    }
+
     const setClauses: string[] = [];
     const values: unknown[] = [];
     let paramIndex = 1;
@@ -360,8 +380,8 @@ export async function PATCH(request: NextRequest) {
       if (!validRoles.includes(newRole)) {
         return NextResponse.json({ error: `Invalid role: ${newRole}.` }, { status: 400 });
       }
-      if (newRole === "super_admin" && session.role !== "super_admin") {
-        return NextResponse.json({ error: "Only a Super Admin can assign the Super Admin role." }, { status: 403 });
+      if (["super_admin", "executive_administrator", "technical_administrator"].includes(newRole) && session.role !== "super_admin") {
+        return NextResponse.json({ error: "Only the Super Admin can assign administrator-level roles." }, { status: 403 });
       }
       setClauses.push(`role = $${paramIndex}`);
       values.push(newRole);
